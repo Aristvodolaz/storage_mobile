@@ -13,17 +13,27 @@ import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.data.response.SearchItem
 import com.komus.sorage_mobile.domain.state.SearchState
 import com.komus.sorage_mobile.domain.viewModel.SearchViewModel
+import com.komus.sorage_mobile.util.SPHelper
+
 @Composable
 fun SearchScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel = hiltViewModel(),
     searchViewModel: SearchViewModel = hiltViewModel(),
+    spHelper: SPHelper = hiltViewModel(),
     onScanClick: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }  // Универсальное поле для поиска
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val searchState by searchViewModel.searchState.collectAsStateWithLifecycle()
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
+    var navigating by remember { mutableStateOf(false) }
+    
+    // Сбрасываем состояние при входе на экран
+    LaunchedEffect(Unit) {
+        searchViewModel.resetState()
+        navigating = false
+    }
 
     // Автопоиск при сканировании
     LaunchedEffect(barcodeData) {
@@ -31,6 +41,24 @@ fun SearchScreen(
             Log.d("SearchScreen", "Searching barcode: $barcodeData")
             query = barcodeData
             scannerViewModel.clearBarcode()
+        }
+    }
+    
+    // Обработка навигации при получении одного результата
+    LaunchedEffect(searchState) {
+        if (searchState is SearchState.Success && !navigating) {
+            val results = (searchState as SearchState.Success).data
+            if (results.size == 1) {
+                navigating = true
+                selectedItem = results.first()
+                
+                // Сохраняем дополнительные данные о товаре
+                saveProductData(spHelper, selectedItem!!)
+                
+                navController.navigate("search_results/${selectedItem!!.ID}")
+                // Сбрасываем состояние после навигации
+                searchViewModel.resetState()
+            }
         }
     }
 
@@ -53,6 +81,7 @@ fun SearchScreen(
             onClick = {
                 if (query.isNotEmpty()) {
                     val isShk = query.length > 7
+                    navigating = false // Сбрасываем флаг навигации перед новым поиском
                     searchViewModel.search(shk = if (isShk) query else null, article = if (!isShk) query else null)
                 }
             },
@@ -75,23 +104,47 @@ fun SearchScreen(
                             Button(
                                 onClick = {
                                     selectedItem = item
+                                    navigating = true
+                                    
+                                    // Сохраняем дополнительные данные о товаре
+                                    saveProductData(spHelper, item)
+                                    
                                     navController.navigate("search_results/${selectedItem!!.ID}")
-                                          },
+                                    // Сбрасываем состояние после навигации
+                                    searchViewModel.resetState()
+                                },
                                 modifier = Modifier.fillMaxWidth().padding(4.dp)
                             ) {
                                 Text(text = item.NAME)
                             }
                         }
                     }
-                } else if (results.size == 1) {
-                    selectedItem = results.first()
-                    navController.navigate("search_results/${selectedItem!!.ID}")
+                } else if (results.size == 1 && !navigating) {
+                    // Показываем информацию о переходе
+                    Text("Найден один товар, переход на страницу товара...")
                 }
             }
             is SearchState.Error -> {
-                Text(text = "Ошибка: ${(searchState as SearchState.Error).message}", color = MaterialTheme.colors.error)
+                val errorMessage = (searchState as SearchState.Error).message
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colors.error,
+                    style = MaterialTheme.typography.body1
+                )
             }
             else -> {}
         }
     }
+}
+
+// Функция для сохранения данных о товаре в SPHelper
+private fun saveProductData(spHelper: SPHelper, item: SearchItem) {
+    // Сохраняем артикул
+    spHelper.saveArticle(item.ARTICLE_ID_REAL)
+    
+    // Сохраняем штрихкод
+    spHelper.saveShk(item.SHK)
+    
+    // Сохраняем название товара
+    spHelper.saveProductName(item.NAME)
 }

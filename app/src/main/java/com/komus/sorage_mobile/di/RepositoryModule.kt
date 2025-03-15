@@ -3,6 +3,7 @@ package com.komus.sorage_mobile.di
 import com.komus.sorage_mobile.data.api.StorageApi
 import com.komus.sorage_mobile.data.repository.MovementRepository
 import com.komus.sorage_mobile.data.repository.PickRepository
+import com.komus.sorage_mobile.data.repository.PlacementRepository
 import com.komus.sorage_mobile.data.repository.ProductSearchRepository
 import com.komus.sorage_mobile.domain.repository.AuthRepository
 import com.komus.sorage_mobile.domain.repository.SearchRepository
@@ -44,5 +45,11 @@ object RepositoryModule {
     @Singleton
     fun provideSearchRepository(apiService: StorageApi): SearchRepository {
         return SearchRepository(apiService)
+    }
+    
+    @Provides
+    @Singleton
+    fun providePlacementRepository(apiService: StorageApi): PlacementRepository {
+        return PlacementRepository(apiService)
     }
 }

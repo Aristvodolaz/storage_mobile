@@ -18,8 +18,10 @@ import androidx.navigation.compose.*
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ProductInfoScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanLocationScreen
+import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanBufferLocationScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.SearchScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.UnitSelectionScreen
+import com.komus.sorage_mobile.presentation.screens.razmechenie.ExpirationDateScreen
 import com.komus.sorage_mobile.util.SPHelper
 import com.komus.sorage_mobile.util.Screen
 import com.komus.sorage_mobile.presentation.screens.peremischenie.ConfirmationScreen
@@ -37,6 +39,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import android.os.Build
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.komus.sorage_mobile.domain.viewModel.PlacementViewModel
 
 @Composable
 fun MainScreen(spHelper: SPHelper,
@@ -101,13 +106,16 @@ fun NavigationGraph(navController: NavHostController,
         composable(Screen.Inventory.route) { ScreenContent("Инвентаризация") }
 
         composable(Screen.Placement.route){
-            SearchScreen(navController = navController,
-                scannerViewModel = scannerViewModel) {}
+            SearchScreen(
+                navController = navController,
+                scannerViewModel = scannerViewModel,
+                spHelper = spHelper
+            ) {}
         }
         
         // Экран снятия товара
         composable(Screen.Removal.route) { 
-            SnyatieScanLocationScreen(navController = navController, scannerViewModel = scannerViewModel)
+            SnyatieScanLocationScreen(navController = navController, scannerViewModel = scannerViewModel, pickViewModel = hiltViewModel())
         }
         
         // Экран перемещения товара
@@ -124,8 +132,31 @@ fun NavigationGraph(navController: NavHostController,
             UnitSelectionScreen(navController, productId =  query, spHelper)
         }
 
-        composable("product_info") { ProductInfoScreen(navController, spHelper) }
-        composable("scan_ir_location") { ScanLocationScreen(navController, spHelper) }
+        composable("product_info") { 
+            val placementViewModel = hiltViewModel<PlacementViewModel>()
+            ProductInfoScreen(navController, spHelper, placementViewModel) 
+        }
+        
+        composable("scan_ir_location") { 
+            ScanLocationScreen(navController, spHelper, scannerViewModel) 
+        }
+        
+        composable("scan_buffer_location") { 
+            val placementViewModel = hiltViewModel<PlacementViewModel>()
+            ScanBufferLocationScreen(navController, spHelper, scannerViewModel, placementViewModel) 
+        }
+        
+        // Экран срока годности
+        composable("expiration_date") { 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ExpirationDateScreen(navController)
+            } else {
+                // Для устройств с API ниже 26 (Android 8.0)
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Эта функция требует Android 8.0 или выше")
+                }
+            }
+        }
         
         // Экраны для перемещения товара
         composable("product_id_input") { 
@@ -146,10 +177,10 @@ fun NavigationGraph(navController: NavHostController,
         
         // Экраны для снятия товара
         composable("pick_item_selection") {
-            ItemSelectionScreen(navController = navController)
+            ItemSelectionScreen(navController = navController, pickViewModel = hiltViewModel(), scannerViewModel = scannerViewModel)
         }
         composable("pick_quantity") {
-            SnyatieQuantityInputScreen(navController = navController)
+            SnyatieQuantityInputScreen(navController = navController, pickViewModel = hiltViewModel(), spHelper = spHelper)
         }
         
         // Экран поиска товаров

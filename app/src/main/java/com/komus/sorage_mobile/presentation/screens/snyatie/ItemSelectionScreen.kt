@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.data.response.LocationItem
 import com.komus.sorage_mobile.domain.state.LocationItemsState
 import com.komus.sorage_mobile.domain.viewModel.PickViewModel
@@ -19,9 +20,68 @@ import com.komus.sorage_mobile.domain.viewModel.PickViewModel
 @Composable
 fun ItemSelectionScreen(
     navController: NavController,
-    pickViewModel: PickViewModel = hiltViewModel()
+    pickViewModel: PickViewModel = hiltViewModel(),
+    scannerViewModel: ScannerViewModel = hiltViewModel()
 ) {
     val locationItemsState by pickViewModel.locationItemsState.collectAsStateWithLifecycle()
+    val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
+    var showLocationDialog by remember { mutableStateOf(false) }
+    var selectedProductItem by remember { mutableStateOf<LocationItem?>(null) }
+    var locationId by remember { mutableStateOf("") }
+    
+    // Обработка сканирования ячейки
+    LaunchedEffect(barcodeData) {
+        if (barcodeData.isNotEmpty() && showLocationDialog) {
+            locationId = barcodeData
+            scannerViewModel.clearBarcode()
+            
+            // Если выбран товар и отсканирована ячейка, запрашиваем товары в ячейке
+            selectedProductItem?.let { productItem ->
+                pickViewModel.getLocationItems(locationId)
+            }
+        }
+    }
+    
+    // Диалог для ввода ячейки
+    if (showLocationDialog) {
+        AlertDialog(
+            onDismissRequest = { showLocationDialog = false },
+            title = { Text("Введите ячейку") },
+            text = {
+                Column {
+                    Text("Введите или отсканируйте ШК ячейки, где находится товар:")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextField(
+                        value = locationId,
+                        onValueChange = { locationId = it.trim() },
+                        label = { Text("ШК ячейки") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (locationId.isNotEmpty()) {
+                            showLocationDialog = false
+                            // Запрашиваем товары в ячейке
+                            pickViewModel.getLocationItems(locationId)
+                        }
+                    },
+                    enabled = locationId.isNotEmpty()
+                ) {
+                    Text("Продолжить")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showLocationDialog = false }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
     
     Column(
         modifier = Modifier
@@ -40,13 +100,31 @@ fun ItemSelectionScreen(
                         style = MaterialTheme.typography.body1
                     )
                 } else {
+                    // Проверяем, есть ли у товаров prunitId
+                    val hasLocation = items.all { it.prunitId.isNotEmpty() }
+                    
+                    if (!hasLocation) {
+                        // Если товары найдены по штрихкоду, показываем информацию
+                        Text(
+                            text = "Найдены товары по штрихкоду. Выберите товар и укажите ячейку:",
+                            style = MaterialTheme.typography.body1
+                        )
+                    }
+                    
                     LazyColumn {
                         items(items) { item ->
                             ItemCard(
                                 item = item,
                                 onClick = {
-                                    pickViewModel.selectItem(item)
-                                    navController.navigate("pick_quantity")
+                                    if (item.prunitId.isEmpty()) {
+                                        // Если товар найден по штрихкоду, запрашиваем ячейку
+                                        selectedProductItem = item
+                                        showLocationDialog = true
+                                    } else {
+                                        // Если товар из ячейки, переходим к вводу количества
+                                        pickViewModel.selectItem(item)
+                                        navController.navigate("pick_quantity")
+                                    }
                                 }
                             )
                         }
@@ -112,11 +190,20 @@ fun ItemCard(
                 text = "Артикул: ${item.article}",
                 style = MaterialTheme.typography.body2
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Количество: ${item.quantity}",
-                style = MaterialTheme.typography.body2
-            )
+            
+            if (item.prunitId.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Ячейка: ${item.prunitId.split("-")[0]}",
+                    style = MaterialTheme.typography.body2
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Количество: ${item.quantity}",
+                    style = MaterialTheme.typography.body2
+                )
+            }
+            
             if (item.barcode != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(

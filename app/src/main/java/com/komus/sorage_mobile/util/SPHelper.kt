@@ -1,7 +1,6 @@
 package com.komus.sorage_mobile.util
 
 import android.content.SharedPreferences
-
 class SPHelper(private val sharedPreferences: SharedPreferences) {
 
     fun saveProductId(productId: String) {
@@ -78,4 +77,33 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
             .remove("quantity")
             .apply()
     }
+
+    // Методы для работы с размещением товара
+
+    fun saveStorageLocation(location: String) {
+        sharedPreferences.edit().putString("storageLocation", location).apply()
+    }
+
+    fun getStorageLocation(): String {
+        return sharedPreferences.getString("storageLocation", "") ?: ""
+    }
+
+    // Методы для работы с буфером
+
+    fun saveBufferLocation(location: String) {
+        sharedPreferences.edit().putString("bufferLocation", location).apply()
+    }
+
+    fun getBufferLocation(): String {
+        return sharedPreferences.getString("bufferLocation", "") ?: ""
+    }
+
+    fun saveUserName(userName: String) {
+        sharedPreferences.edit().putString("userName", userName).apply()
+    }
+
+    fun getUserName(): String {
+        return sharedPreferences.getString("userName", "user") ?: "user"
+    }
+
 }

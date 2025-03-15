@@ -18,26 +18,46 @@ import com.komus.sorage_mobile.domain.viewModel.PickViewModel
 fun ScanLocationScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel = hiltViewModel(),
-    pickViewModel: PickViewModel = hiltViewModel()
+    pickViewModel: PickViewModel
 ) {
     var locationId by remember { mutableStateOf("") }
+    var skladId by remember { mutableStateOf("85") } // Значение по умолчанию
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val locationItemsState by pickViewModel.locationItemsState.collectAsStateWithLifecycle()
+    var scanMode by remember { mutableStateOf(ScanMode.LOCATION) } // Режим сканирования: ячейка или товар
     
     // Очищаем состояние при входе на экран
     LaunchedEffect(Unit) {
         pickViewModel.resetLocationItemsState()
+        // Устанавливаем ID склада
+        pickViewModel.setSkladId(skladId)
+    }
+    
+    // Обновляем ID склада при его изменении
+    LaunchedEffect(skladId) {
+        pickViewModel.setSkladId(skladId)
     }
     
     // Автозаполнение при сканировании
     LaunchedEffect(barcodeData) {
         if (barcodeData.isNotEmpty()) {
-            Log.d("ScanLocationScreen", "Сканирована ячейка: $barcodeData")
-            locationId = barcodeData
+            val scannedCode = barcodeData
             scannerViewModel.clearBarcode()
             
-            // Запрашиваем товары в ячейке
-            pickViewModel.getLocationItems(locationId)
+            when (scanMode) {
+                ScanMode.LOCATION -> {
+                    Log.d("ScanLocationScreen", "Сканирована ячейка: $scannedCode")
+                    locationId = scannedCode
+                    
+                    // Запрашиваем товары в ячейке
+                    pickViewModel.getLocationItems(locationId)
+                }
+                ScanMode.PRODUCT -> {
+                    Log.d("ScanLocationScreen", "Сканирован товар: $scannedCode")
+                    // Ищем товар по штрихкоду
+                    pickViewModel.searchProductByBarcode(scannedCode)
+                }
+            }
         }
     }
     
@@ -68,31 +88,90 @@ fun ScanLocationScreen(
         Text(text = "Снятие товара", style = MaterialTheme.typography.h6)
         Spacer(modifier = Modifier.height(16.dp))
         
-        Text(
-            text = "Отсканируйте или введите ШК ячейки",
-            style = MaterialTheme.typography.body1
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        TextField(
-            value = locationId,
-            onValueChange = { locationId = it.trim() },
-            label = { Text("ШК ячейки") },
-            modifier = Modifier.fillMaxWidth()
-        )
+        // Переключатель режима сканирования
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            TabRow(
+                selectedTabIndex = scanMode.ordinal,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Tab(
+                    selected = scanMode == ScanMode.LOCATION,
+                    onClick = { scanMode = ScanMode.LOCATION },
+                    text = { Text("Сканировать ячейку") }
+                )
+                Tab(
+                    selected = scanMode == ScanMode.PRODUCT,
+                    onClick = { scanMode = ScanMode.PRODUCT },
+                    text = { Text("Сканировать товар") }
+                )
+            }
+        }
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        Button(
-            onClick = {
-                if (locationId.isNotEmpty()) {
-                    pickViewModel.getLocationItems(locationId)
+        when (scanMode) {
+            ScanMode.LOCATION -> {
+                Text(
+                    text = "Отсканируйте или введите ШК ячейки",
+                    style = MaterialTheme.typography.body1
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                TextField(
+                    value = locationId,
+                    onValueChange = { locationId = it.trim() },
+                    label = { Text("ШК ячейки") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                TextField(
+                    value = skladId,
+                    onValueChange = { skladId = it.trim() },
+                    label = { Text("ID склада") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Button(
+                    onClick = {
+                        if (locationId.isNotEmpty()) {
+                            pickViewModel.getLocationItems(locationId)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = locationId.isNotEmpty()
+                ) {
+                    Text("Продолжить")
                 }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = locationId.isNotEmpty()
-        ) {
-            Text("Продолжить")
+            }
+            ScanMode.PRODUCT -> {
+                Text(
+                    text = "Отсканируйте штрихкод товара",
+                    style = MaterialTheme.typography.body1
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                TextField(
+                    value = "",
+                    onValueChange = { /* Не используется, только сканирование */ },
+                    label = { Text("Штрихкод товара") },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = false
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Для поиска товара отсканируйте его штрихкод",
+                    style = MaterialTheme.typography.caption
+                )
+            }
         }
         
         Spacer(modifier = Modifier.height(16.dp))
@@ -101,7 +180,7 @@ fun ScanLocationScreen(
             is LocationItemsState.Loading -> {
                 CircularProgressIndicator()
                 Text(
-                    text = "Загрузка товаров в ячейке...",
+                    text = "Загрузка товаров...",
                     style = MaterialTheme.typography.body2,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -117,4 +196,8 @@ fun ScanLocationScreen(
             else -> {}
         }
     }
+}
+
+enum class ScanMode {
+    LOCATION, PRODUCT
 } 

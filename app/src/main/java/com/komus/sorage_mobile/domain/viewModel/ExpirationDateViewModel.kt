@@ -1,6 +1,7 @@
 package com.komus.sorage_mobile.domain.viewModel
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -23,12 +24,25 @@ class ExpirationDateViewModel @Inject constructor(
 
     @RequiresApi(Build.VERSION_CODES.O)
     fun calculateEndDate(startDate: String, days: String, months: String): String {
-        return try {
-            val initialDate = LocalDate.parse(startDate, inputFormatter)
-            val finalDate = initialDate.plusDays(days.toLongOrNull() ?: 0).plusMonths(months.toLongOrNull() ?: 0)
-            finalDate.format(outputFormatter)
+        try {
+            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            val date = LocalDate.parse(startDate, formatter)
+            
+            var daysToAdd = 0
+            if (days.isNotEmpty()) {
+                daysToAdd = days.toInt()
+            }
+            
+            var monthsToAdd = 0
+            if (months.isNotEmpty()) {
+                monthsToAdd = months.toInt()
+            }
+            
+            val resultDate = date.plusDays(daysToAdd.toLong()).plusMonths(monthsToAdd.toLong())
+            return resultDate.format(formatter)
         } catch (e: Exception) {
-            ""
+            Log.e("ExpirationDateViewModel", "Ошибка расчета даты: ${e.message}")
+            return ""
         }
     }
 
@@ -36,7 +50,10 @@ class ExpirationDateViewModel @Inject constructor(
     fun saveExpirationData(startDate: String, days: String, months: String, condition: String) {
         viewModelScope.launch {
             val endDate = calculateEndDate(startDate, days, months)
+            Log.d("ExpirationDateViewModel", "Сохраняем срок годности: $endDate")
             spHelper.saveSrokGodnosti(endDate)
+            
+            Log.d("ExpirationDateViewModel", "Сохраняем состояние товара: $condition")
             spHelper.saveCondition(condition)
         }
     }

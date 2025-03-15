@@ -31,4 +31,9 @@ class SearchViewModel @Inject constructor(
             }
         }
     }
+    
+    // Функция для сброса состояния поиска
+    fun resetState() {
+        _searchState.value = SearchState.Idle
+    }
 }

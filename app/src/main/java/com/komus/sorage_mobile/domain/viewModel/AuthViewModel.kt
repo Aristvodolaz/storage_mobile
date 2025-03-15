@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.komus.sorage_mobile.data.response.AuthResponse
 import com.komus.sorage_mobile.domain.usecase.AuthenticateUseCase
+import com.komus.sorage_mobile.util.SPHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +17,8 @@ import javax.inject.Inject
 import com.komus.sorage_mobile.domain.models.Result
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authenticateUseCase: AuthenticateUseCase
+    private val authenticateUseCase: AuthenticateUseCase,
+    private val spHelper: SPHelper
 ) : ViewModel() {
 
     sealed class AuthState {
@@ -41,6 +43,11 @@ class AuthViewModel @Inject constructor(
             when (val result = authenticateUseCase(trimmedBarcode)) {
                 is Result.Success -> {
                     val user = result.data
+                    
+                    // Сохраняем имя пользователя в SPHelper
+                    Log.d("AuthViewModel", "Сохраняем имя пользователя: ${user.name}")
+                    spHelper.saveUserName(user.name)
+                    
                     _authStatus.value = AuthState.Success(user)
                 }
                 is Result.Error -> {

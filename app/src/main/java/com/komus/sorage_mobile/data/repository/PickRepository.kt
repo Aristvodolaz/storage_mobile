@@ -2,6 +2,7 @@ package com.komus.sorage_mobile.data.repository
 
 import android.util.Log
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
 import com.komus.sorage_mobile.data.response.BaseResponse
 import com.komus.sorage_mobile.data.response.LocationItem
@@ -56,6 +57,35 @@ class PickRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара: ${e.message}")
+            BaseResponse(success = false, message = e.message)
+        }
+    }
+    
+    suspend fun pickFromLocation(
+        productId: String,
+        wrShk: String,
+        prunitId: String,
+        quantity: Int,
+        executor: String,
+        skladId: String
+    ): BaseResponse {
+        Log.d("PickRepository", "Снятие товара из ячейки: productId=$productId, wrShk=$wrShk, quantity=$quantity")
+        
+        val request = PickFromLocationRequest(
+            productId = productId,
+            WR_SHK = wrShk,
+            prunitId = prunitId,
+            quantity = quantity,
+            executor = executor,
+            sklad_id = skladId
+        )
+        
+        return try {
+            withContext(Dispatchers.IO) {
+                api.pickFromLocation(request)
+            }
+        } catch (e: Exception) {
+            Log.e("PickRepository", "Ошибка при снятии товара из ячейки: ${e.message}")
             BaseResponse(success = false, message = e.message)
         }
     }

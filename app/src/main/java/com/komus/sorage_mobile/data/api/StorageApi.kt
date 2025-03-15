@@ -1,6 +1,8 @@
 package com.komus.sorage_mobile.data.api
 
+import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
+import com.komus.sorage_mobile.data.request.PlaceProductRequest
 import com.komus.sorage_mobile.data.response.AuthResponse
 import com.komus.sorage_mobile.data.response.BaseResponse
 import com.komus.sorage_mobile.data.response.LocationItemsResponse
@@ -53,4 +55,15 @@ interface StorageApi {
         @Query("shk") shk: String?,
         @Query("article") article: String?
     ): ProductSearchResponse
+    
+    @POST("/api/storage/{productId}/buffer")
+    suspend fun placeProductToBuffer(
+        @Path("productId") productId: String,
+        @Body request: PlaceProductRequest
+    ): BaseResponse
+    
+    @POST("/api/storage/pick-from-location")
+    suspend fun pickFromLocation(
+        @Body request: PickFromLocationRequest
+    ): BaseResponse
 }
