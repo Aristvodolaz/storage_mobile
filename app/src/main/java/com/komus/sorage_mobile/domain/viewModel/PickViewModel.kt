@@ -7,9 +7,11 @@ import com.komus.sorage_mobile.data.response.LocationItem
 import com.komus.sorage_mobile.domain.state.LocationItemsState
 import com.komus.sorage_mobile.domain.state.PickState
 import com.komus.sorage_mobile.domain.usecase.GetLocationItemsUseCase
+import com.komus.sorage_mobile.domain.usecase.PickFromLocationBySkladIdUseCase
 import com.komus.sorage_mobile.domain.usecase.PickFromLocationUseCase
 import com.komus.sorage_mobile.domain.usecase.PickProductUseCase
 import com.komus.sorage_mobile.domain.usecase.SearchUseCase
+import com.komus.sorage_mobile.util.SPHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,7 +25,9 @@ class PickViewModel @Inject constructor(
     private val getLocationItemsUseCase: GetLocationItemsUseCase,
     private val pickProductUseCase: PickProductUseCase,
     private val pickFromLocationUseCase: PickFromLocationUseCase,
-    private val searchUseCase: SearchUseCase
+    private val pickFromLocationBySkladIdUseCase: PickFromLocationBySkladIdUseCase,
+    private val searchUseCase: SearchUseCase,
+    private val spHelper: SPHelper
 ) : ViewModel() {
 
     private val _locationItemsState = MutableStateFlow<LocationItemsState>(LocationItemsState.Initial)
@@ -43,7 +47,7 @@ class PickViewModel @Inject constructor(
         _locationItemsState.value = LocationItemsState.Loading
         
         viewModelScope.launch {
-            getLocationItemsUseCase(locationId).collectLatest { result ->
+            getLocationItemsUseCase(locationId, spHelper.getSkladId()).collectLatest { result ->
                 result.fold(
                     onSuccess = { items ->
                         Log.d("PickViewModel", "Получено ${items.size} товаров")
@@ -79,11 +83,12 @@ class PickViewModel @Inject constructor(
                             // Преобразуем SearchItem в LocationItem для совместимости
                             val locationItems = searchItems.map { searchItem ->
                                 LocationItem(
-                                    productId = searchItem.ID,
-                                    prunitId = "", // Будет заполнено при выборе ячейки
+                                    id = searchItem.ID,
                                     name = searchItem.NAME,
-                                    quantity = 0, // Будет заполнено при выборе ячейки
                                     article = searchItem.ARTICLE_ID_REAL,
+                                    shk = searchItem.SHK,
+                                    // Для обратной совместимости
+                                    productId = searchItem.ID,
                                     barcode = searchItem.SHK
                                 )
                             }
@@ -117,20 +122,30 @@ class PickViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                val response = pickProductUseCase(
-                    productId = item.productId,
-                    locationId = item.prunitId.split("-")[0], // Предполагаем, что locationId - это первая часть prunitId
-                    prunitId = item.prunitId,
-                    quantity = quantity,
-                    executor = executor
-                )
-                
-                if (response.success) {
-                    Log.d("PickViewModel", "Товар успешно снят")
-                    _pickState.value = PickState.Success
-                } else {
-                    Log.e("PickViewModel", "Ошибка снятия товара: ${response.message}")
-                    _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара")
+                val response = item.productId?.let {
+                    item.wrShk?.let { it1 ->
+                        item.prunitId?.let { it2 ->
+                            pickProductUseCase(
+                                productId = it,
+                                locationId = it1, // Предполагаем, что locationId - это первая часть prunitId
+                                prunitId = it2,
+                                quantity = quantity,
+                                executor = executor
+                            )
+                        }
+                    }
+                }
+
+                if (response != null) {
+                    if (response.success) {
+                        Log.d("PickViewModel", "Товар успешно снят")
+                        _pickState.value = PickState.Success
+                    } else {
+                        Log.e("PickViewModel", "Ошибка снятия товара: ${response.message}")
+                        if (response != null) {
+                            _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара")
+                        }
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("PickViewModel", "Исключение при снятии товара: ${e.message}")
@@ -141,7 +156,7 @@ class PickViewModel @Inject constructor(
     
     fun pickFromLocation(quantity: Int, executor: String) {
         val item = _selectedItem ?: return
-        val locationId = item.prunitId.split("-")[0] // Предполагаем, что locationId - это первая часть prunitId
+        val locationId = item.wrShk // Предполагаем, что locationId - это первая часть prunitId
         
         Log.d("PickViewModel", "Снятие товара из ячейки: ${item.productId}, ячейка: $locationId, количество: $quantity")
         _pickState.value = PickState.Loading
@@ -150,25 +165,74 @@ class PickViewModel @Inject constructor(
             try {
                 val skladId = if (_skladId.isNotEmpty()) _skladId else "85" // Используем значение по умолчанию, если не задано
                 
-                val response = pickFromLocationUseCase(
-                    productId = item.productId,
-                    wrShk = locationId,
-                    prunitId = item.prunitId,
-                    quantity = quantity,
-                    executor = executor,
-                    skladId = skladId
-                )
-                
-                if (response.success) {
-                    Log.d("PickViewModel", "Товар успешно снят из ячейки")
-                    _pickState.value = PickState.Success
-                } else {
-                    Log.e("PickViewModel", "Ошибка снятия товара из ячейки: ${response.message}")
-                    _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки")
+                val response = item.productId?.let {
+                    item.prunitId?.let { it1 ->
+                        if (locationId != null) {
+                            pickFromLocationUseCase(
+                                productId = it,
+                                wrShk = locationId,
+                                prunitId = it1,
+                                quantity = quantity,
+                                executor = executor,
+                                skladId = skladId
+                            )
+                        } else null
+                    }
+                }
+
+                if (response != null) {
+                    if (response.success) {
+                        Log.d("PickViewModel", "Товар успешно снят из ячейки")
+                        _pickState.value = PickState.Success
+                    } else {
+                        Log.e("PickViewModel", "Ошибка снятия товара из ячейки: ${response.message}")
+                        _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("PickViewModel", "Исключение при снятии товара из ячейки: ${e.message}")
                 _pickState.value = PickState.Error(e.message ?: "Произошла ошибка при снятии товара из ячейки")
+            }
+        }
+    }
+    
+    fun pickFromLocationBySkladId(quantity: Int, executor: String) {
+        val item = _selectedItem ?: return
+
+        
+        Log.d("PickViewModel", "Снятие товара из ячейки с учетом склада: ${item.id}, ячейка: ${item.locationId}, количество: $quantity")
+        _pickState.value = PickState.Loading
+        
+        viewModelScope.launch {
+            try {
+                val skladId = if (_skladId.isNotEmpty()) _skladId else "85" // Используем значение по умолчанию, если не задано
+                
+                // Получаем ID ячейки из объекта товара
+                val locationIdStr = item.locationId?.toString() ?: "0"
+                
+                val response = item.wrShk?.let {
+                    pickFromLocationBySkladIdUseCase(
+                        productId = item.article,
+                        wrShk = it,
+                        prunitId = item.units.firstOrNull()?.prunitId?.toString() ?: "10",
+                        quantity = quantity,
+                        executor = executor,
+                        skladId = skladId
+                    )
+                }
+
+                if (response != null) {
+                    if (response.success) {
+                        Log.d("PickViewModel", "Товар успешно снят из ячейки с учетом склада")
+                        _pickState.value = PickState.Success
+                    } else {
+                        Log.e("PickViewModel", "Ошибка снятия товара из ячейки с учетом склада: ${response.message}")
+                        _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки с учетом склада")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("PickViewModel", "Исключение при снятии товара из ячейки с учетом склада: ${e.message}")
+                _pickState.value = PickState.Error(e.message ?: "Произошла ошибка при снятии товара из ячейки с учетом склада")
             }
         }
     }

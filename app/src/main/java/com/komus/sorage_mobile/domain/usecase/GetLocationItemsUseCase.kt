@@ -8,7 +8,7 @@ import javax.inject.Inject
 class GetLocationItemsUseCase @Inject constructor(
     private val pickRepository: PickRepository
 ) {
-    suspend operator fun invoke(locationId: String): Flow<Result<List<LocationItem>>> {
-        return pickRepository.getLocationItems(locationId)
+    suspend operator fun invoke(locationId: String, sklad:String): Flow<Result<List<LocationItem>>> {
+        return pickRepository.getLocationItems(locationId, sklad)
     }
 } 

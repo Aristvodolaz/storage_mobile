@@ -379,13 +379,13 @@ fun ScanLocationScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
                 }
                 
-                Button(
-                    onClick = {
+        Button(
+            onClick = {
                         // Возвращаемся назад, если пользователь хочет отменить
-                        navController.popBackStack()
+                navController.popBackStack()
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
@@ -605,7 +605,7 @@ fun ScanBufferLocationScreen(
                         contentDescription = "Сканировать",
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text("Сканировать")
+            Text("Сканировать")
                 }
             }
         }

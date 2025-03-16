@@ -30,9 +30,8 @@ import com.komus.sorage_mobile.presentation.screens.peremischenie.QuantityInputS
 import com.komus.sorage_mobile.presentation.screens.peremischenie.SourceLocationScreen
 import com.komus.sorage_mobile.presentation.screens.peremischenie.TargetLocationScreen
 import com.komus.sorage_mobile.presentation.screens.search.ProductSearchScreen
-import com.komus.sorage_mobile.presentation.screens.snyatie.ItemSelectionScreen
 import com.komus.sorage_mobile.presentation.screens.snyatie.ScanLocationScreen as SnyatieScanLocationScreen
-import com.komus.sorage_mobile.presentation.screens.snyatie.QuantityInputScreen as SnyatieQuantityInputScreen
+
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -41,7 +40,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import android.os.Build
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.komus.sorage_mobile.domain.viewModel.PickViewModel
 import com.komus.sorage_mobile.domain.viewModel.PlacementViewModel
+import com.komus.sorage_mobile.presentation.components.TopConnectionStatusBar
 
 @Composable
 fun MainScreen(spHelper: SPHelper,
@@ -53,6 +54,14 @@ fun MainScreen(spHelper: SPHelper,
         color = MaterialTheme.colorScheme.background
     ) {
         Scaffold(
+            topBar = { 
+                // Добавляем отступ для системной статус-бары
+                Box(
+                    modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
+                ) {
+                    TopConnectionStatusBar()
+                }
+            },
             bottomBar = { 
                 // Добавляем отступ для системной навигации
                 Box(
@@ -60,9 +69,16 @@ fun MainScreen(spHelper: SPHelper,
                 ) {
                     BottomNavigationBar(navController)
                 }
-            }
+            },
+            // Отключаем встроенные отступы Scaffold, чтобы управлять ими вручную
+            contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { paddingValues ->
-            Box(modifier = Modifier.padding(paddingValues)) {
+            // Используем padding из paddingValues для корректного отображения контента
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
                 NavigationGraph(navController, spHelper, scannerViewModel)
             }
         }
@@ -114,8 +130,14 @@ fun NavigationGraph(navController: NavHostController,
         }
         
         // Экран снятия товара
-        composable(Screen.Removal.route) { 
-            SnyatieScanLocationScreen(navController = navController, scannerViewModel = scannerViewModel, pickViewModel = hiltViewModel())
+        composable(Screen.Removal.route) {
+            val pickViewModel = hiltViewModel<PickViewModel>()
+            SnyatieScanLocationScreen(
+                navController = navController, 
+                scannerViewModel = scannerViewModel, 
+                pickViewModel = pickViewModel, 
+                spHelper = spHelper
+            )
         }
         
         // Экран перемещения товара
@@ -174,15 +196,7 @@ fun NavigationGraph(navController: NavHostController,
         composable("confirmation") { 
             ConfirmationScreen(navController = navController, spHelper = spHelper)
         }
-        
-        // Экраны для снятия товара
-        composable("pick_item_selection") {
-            ItemSelectionScreen(navController = navController, pickViewModel = hiltViewModel(), scannerViewModel = scannerViewModel)
-        }
-        composable("pick_quantity") {
-            SnyatieQuantityInputScreen(navController = navController, pickViewModel = hiltViewModel(), spHelper = spHelper)
-        }
-        
+
         // Экран поиска товаров
         composable("product_search") {
             ProductSearchScreen(navController = navController, scannerViewModel = scannerViewModel)
@@ -202,4 +216,52 @@ fun ScreenContent(title: String) {
 fun currentRoute(navController: NavController): String? {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     return navBackStackEntry?.destination?.route
+}
+
+@Composable
+fun StartScreen(
+    navController: NavController,
+    spHelper: SPHelper,
+    scannerViewModel: ScannerViewModel,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Button(
+            onClick = { navController.navigate("scan_storage_location") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(56.dp)
+        ) {
+            Text("Снятие")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { navController.navigate("placement") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(56.dp)
+        ) {
+            Text("Размещение")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(
+            onClick = { navController.navigate("movement") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(56.dp)
+        ) {
+            Text("Перемещение")
+        }
+    }
 }

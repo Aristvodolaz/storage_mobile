@@ -1,6 +1,7 @@
 package com.komus.sorage_mobile.util
 
 import android.content.SharedPreferences
+
 class SPHelper(private val sharedPreferences: SharedPreferences) {
 
     fun saveProductId(productId: String) {
@@ -104,6 +105,50 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
 
     fun getUserName(): String {
         return sharedPreferences.getString("userName", "user") ?: "user"
+    }
+
+    fun saveWrShk(wrShk: String) {
+        sharedPreferences.edit().putString("wrShk", wrShk).apply()
+    }
+
+    fun getWrShk(): String {
+        return sharedPreferences.getString("wrShk", "") ?: ""
+    }
+
+    // Методы для работы с именем продукта
+    fun saveProductName(productName: String) {
+        sharedPreferences.edit().putString("productName", productName).apply()
+    }
+
+    fun getProductName(): String {
+        return sharedPreferences.getString("productName", "") ?: ""
+    }
+
+    // Методы для работы со штрихкодом
+    fun saveShk(shk: String) {
+        sharedPreferences.edit().putString("shk", shk).apply()
+    }
+
+    fun getShk(): String {
+        return sharedPreferences.getString("shk", "") ?: ""
+    }
+
+    // Методы для работы с артикулом
+    fun saveArticle(article: String) {
+        sharedPreferences.edit().putString("article", article).apply()
+    }
+
+    fun getArticle(): String {
+        return sharedPreferences.getString("article", "") ?: ""
+    }
+
+    // Методы для работы с ID склада
+    fun saveSkladId(skladId: String) {
+        sharedPreferences.edit().putString("skladId", skladId).apply()
+    }
+
+    fun getSkladId(): String {
+        return sharedPreferences.getString("skladId", "85") ?: "85"
     }
 
 }

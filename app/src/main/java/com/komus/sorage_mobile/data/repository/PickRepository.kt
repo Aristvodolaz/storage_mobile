@@ -15,11 +15,11 @@ import javax.inject.Inject
 class PickRepository @Inject constructor(
     private val api: StorageApi
 ) {
-    suspend fun getLocationItems(locationId: String): Flow<Result<List<LocationItem>>> = flow {
+    suspend fun getLocationItems(locationId: String, sklad:String): Flow<Result<List<LocationItem>>> = flow {
         try {
             Log.d("PickRepository", "Запрос товаров в ячейке: $locationId")
             val response = withContext(Dispatchers.IO) {
-                api.getLocationItems(locationId)
+                api.getLocationItems(locationId, locationId, sklad)
             }
             
             if (response.success) {
@@ -86,6 +86,35 @@ class PickRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара из ячейки: ${e.message}")
+            BaseResponse(success = false, message = e.message)
+        }
+    }
+    
+    suspend fun pickFromLocationBySkladId(
+        productId: String,
+        wrShk: String,
+        prunitId: String,
+        quantity: Int,
+        executor: String,
+        skladId: String
+    ): BaseResponse {
+        Log.d("PickRepository", "Снятие товара из ячейки с учетом склада: productId=$productId, wrShk=$wrShk, skladId=$skladId, quantity=$quantity")
+        
+        val request = PickFromLocationRequest(
+            productId = productId,
+            WR_SHK = wrShk,
+            prunitId = prunitId,
+            quantity = quantity,
+            executor = executor,
+            sklad_id = skladId
+        )
+        
+        return try {
+            withContext(Dispatchers.IO) {
+                api.pickFromLocationBySkladId(request)
+            }
+        } catch (e: Exception) {
+            Log.e("PickRepository", "Ошибка при снятии товара из ячейки с учетом склада: ${e.message}")
             BaseResponse(success = false, message = e.message)
         }
     }

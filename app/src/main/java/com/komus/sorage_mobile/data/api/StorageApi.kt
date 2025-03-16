@@ -39,10 +39,12 @@ interface StorageApi {
         @Body requestBody: Map<String, Any>
     ): BaseResponse
     
-    @GET("/api/storage/location/{locationId}/items")
+    @GET("/api/storage/location-items/{locationId}")
     suspend fun getLocationItems(
-        @Path("locationId") locationId: String
-    ): LocationItemsResponse
+        @Path("locationId") locationId: String,
+        @Query("locationId") wrShk: String,
+        @Query("id_sklad") id_sklad: String,
+        ): LocationItemsResponse
     
     @POST("/api/storage/{productId}/location/pick")
     suspend fun pickProduct(
@@ -64,6 +66,11 @@ interface StorageApi {
     
     @POST("/api/storage/pick-from-location")
     suspend fun pickFromLocation(
+        @Body request: PickFromLocationRequest
+    ): BaseResponse
+    
+    @POST("/api/storage/pick-from-location-by-sklad-id")
+    suspend fun pickFromLocationBySkladId(
         @Body request: PickFromLocationRequest
     ): BaseResponse
 }

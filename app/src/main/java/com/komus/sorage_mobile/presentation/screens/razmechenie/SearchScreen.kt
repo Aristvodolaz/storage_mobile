@@ -20,7 +20,7 @@ fun SearchScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel = hiltViewModel(),
     searchViewModel: SearchViewModel = hiltViewModel(),
-    spHelper: SPHelper = hiltViewModel(),
+    spHelper: SPHelper,
     onScanClick: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }  // Универсальное поле для поиска

@@ -12,12 +12,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.Scaffold
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
+import androidx.navigation.compose.rememberNavController
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.screens.MainScreen
 import com.komus.sorage_mobile.ui.theme.Sorage_mobileTheme
@@ -39,6 +37,7 @@ class MainActivity : ComponentActivity() {
         
         // Настройка отображения с учетом системных элементов
         enableEdgeToEdge()
+        // Указываем, что декорации окна не должны учитываться при размещении контента
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         registerScanReceiver()
@@ -73,21 +72,5 @@ class MainActivity : ComponentActivity() {
         } else {
             registerReceiver(scanReceiver, intentFilter)
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Sorage_mobileTheme {
-        Greeting("Android")
     }
 }
