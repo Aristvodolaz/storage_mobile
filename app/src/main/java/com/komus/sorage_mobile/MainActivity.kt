@@ -35,10 +35,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Настройка отображения с учетом системных элементов
+        // Настройка отображения на весь экран
         enableEdgeToEdge()
-        // Указываем, что декорации окна не должны учитываться при размещении контента
+        // Настройка отображения контента под системными элементами
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        // Установка прозрачности статус-бара и навигационной панели
+        window.statusBarColor = android.graphics.Color.TRANSPARENT
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         registerScanReceiver()
 

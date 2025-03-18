@@ -1,33 +1,28 @@
 package com.komus.sorage_mobile.data.response
 
+import com.google.gson.annotations.SerializedName
+
 data class LocationItemsResponse(
-    val success: Boolean,
-    val data: List<LocationItem>,
-    val message: String? = null,
-    val errorCode: Int? = null
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("data") val data: List<LocationItem>,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("errorCode") val errorCode: Int? = null
 )
 
-data class Units(
-    val prunitId: Int,
-    val prunitName: String,
-    val quantity: String,
-    val conditionState: String,
-    val expirationDate: String? = null
+data class ItemUnit(
+    @SerializedName("prunitId") val prunitId: Int,
+    @SerializedName("prunitName") val prunitName: String,
+    @SerializedName("quantity") val quantity: String,
+    @SerializedName("conditionState") val conditionState: String,
+    @SerializedName("expirationDate") val expirationDate: String? = null
 )
 
 data class LocationItem(
-    val id: String,
-    val name: String,
-    val article: String,
-    val shk: String,
-    val locationId: Int? = null,
-    val units: List<Units> = emptyList(),
-    
-    // Поля для обратной совместимости
-    val productId: String? = null,
-    val prunitId: String? = null,
-    val quantity: Int? = null,
-    val barcode: String? = null,
-    val idSklad: Int? = null,
-    val wrShk: String? = null
+    @SerializedName("id") val id: Int,
+    @SerializedName("name") val name: String,
+    @SerializedName("article") val article: String,
+    @SerializedName("shk") val shk: String,
+    @SerializedName("idSklad") val idSklad: Int,
+    @SerializedName("wrShk") val wrShk: String,
+    @SerializedName("units") val units: List<ItemUnit> = emptyList()
 ) 

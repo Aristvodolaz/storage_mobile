@@ -1,4 +1,5 @@
 package com.komus.sorage_mobile.presentation.screens.razmechenie
+
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.*
@@ -17,7 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.komus.sorage_mobile.domain.viewModel.ExpirationDateViewModel
@@ -42,226 +45,301 @@ fun ExpirationDateScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .verticalScroll(scrollState)
-    ) {
-        Text(
-            text = "Введите срок годности", 
-            style = MaterialTheme.typography.h6,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        // Карточка для ввода даты
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            elevation = 4.dp,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                Text(
-                    text = "Дата производства",
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                OutlinedTextField(
-                    value = startDate,
-                    onValueChange = { startDate = it },
-                    label = { Text("Начальная дата (дд.мм.гггг)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Календарь"
-                        )
-                    }
-                )
-            }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { 
+                    Text(
+                        "Срок годности", 
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    ) 
+                },
+                backgroundColor = MaterialTheme.colors.primary,
+                contentColor = Color.White,
+                modifier = Modifier.height(44.dp)
+            )
         }
-        
-        // Карточка для ввода срока хранения
-        Card(
+    ) { paddingValues ->
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            elevation = 4.dp,
-            shape = RoundedCornerShape(8.dp)
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .verticalScroll(scrollState)
         ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
+            // Карточка для ввода даты
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(4.dp)
             ) {
-                Text(
-                    text = "Срок хранения",
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Row {
-                    OutlinedTextField(
-                        value = days,
-                        onValueChange = { 
-                            // Проверяем, что введено число
-                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                days = it
-                            }
-                        },
-                        label = { Text("Дни") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
+                Column(
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = "Дата производства",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
                     OutlinedTextField(
-                        value = months,
-                        onValueChange = { 
-                            // Проверяем, что введено число
-                            if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                months = it
-                            }
+                        value = startDate,
+                        onValueChange = { startDate = it },
+                        label = { 
+                            Text(
+                                "Начальная дата (дд.мм.гггг)",
+                                fontSize = 10.sp
+                            ) 
                         },
-                        label = { Text("Месяцы") },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                        singleLine = true,
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.CalendarToday,
+                                contentDescription = "Календарь",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     )
                 }
             }
-        }
-        
-        // Карточка с результатом расчета
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            elevation = 4.dp,
-            shape = RoundedCornerShape(8.dp),
-            backgroundColor = if (endDate.isNotEmpty()) Color(0xFFE8F5E9) else MaterialTheme.colors.surface
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
+            
+            // Карточка для ввода срока хранения
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(4.dp)
             ) {
-                Text(
-                    text = "Дата окончания срока годности",
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                OutlinedTextField(
-                    value = endDate,
-                    onValueChange = {},
-                    label = { Text("Конечная дата") },
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.DateRange,
-                            contentDescription = "Дата окончания"
-                        )
-                    }
-                )
-            }
-        }
-        
-        // Карточка для выбора состояния
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            elevation = 4.dp,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(12.dp)
-            ) {
-                Text(
-                    text = "Состояние товара",
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    modifier = Modifier.padding(8.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        RadioButton(
-                            selected = condition == "Кондиция",
-                            onClick = { condition = "Кондиция" },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = MaterialTheme.colors.primary
-                            )
+                    Text(
+                        text = "Срок хранения",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Row {
+                        OutlinedTextField(
+                            value = days,
+                            onValueChange = { 
+                                // Проверяем, что введено число
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    days = it
+                                }
+                            },
+                            label = { 
+                                Text(
+                                    "Дни",
+                                    fontSize = 10.sp
+                                ) 
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            singleLine = true
                         )
-                        Text("Кондиция")
+                        
+                        Spacer(modifier = Modifier.width(4.dp))
+                        
+                        OutlinedTextField(
+                            value = months,
+                            onValueChange = { 
+                                // Проверяем, что введено число
+                                if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                                    months = it
+                                }
+                            },
+                            label = { 
+                                Text(
+                                    "Месяцы",
+                                    fontSize = 10.sp
+                                ) 
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            singleLine = true
+                        )
                     }
+                }
+            }
+            
+            // Карточка с результатом расчета
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(4.dp),
+                backgroundColor = if (endDate.isNotEmpty()) Color(0xFFE8F5E9) else MaterialTheme.colors.surface
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = "Дата окончания срока годности",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    OutlinedTextField(
+                        value = endDate,
+                        onValueChange = {},
+                        label = { 
+                            Text(
+                                "Конечная дата",
+                                fontSize = 10.sp
+                            ) 
+                        },
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                        singleLine = true,
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.DateRange,
+                                contentDescription = "Дата окончания",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    )
+                }
+            }
+            
+            // Карточка для выбора состояния
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                elevation = 2.dp,
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text(
+                        text = "Состояние товара",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
                     
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        RadioButton(
-                            selected = condition == "Некондиция",
-                            onClick = { condition = "Некондиция" },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = MaterialTheme.colors.primary
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            RadioButton(
+                                selected = condition == "Кондиция",
+                                onClick = { condition = "Кондиция" },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colors.primary
+                                ),
+                                modifier = Modifier.size(16.dp)
                             )
-                        )
-                        Text("Некондиция")
+                            Text(
+                                "Кондиция",
+                                fontSize = 10.sp
+                            )
+                        }
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            RadioButton(
+                                selected = condition == "Некондиция",
+                                onClick = { condition = "Некондиция" },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = MaterialTheme.colors.primary
+                                ),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                "Некондиция",
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Кнопки навигации
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Button(
-                onClick = { navController.popBackStack() },
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = Color.LightGray
-                ),
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Назад")
-            }
             
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
-            Button(
-                onClick = {
-                    viewModel.saveExpirationData(startDate, days, months, condition ?: "")
-                    navController.navigate("product_info")
-                },
-                modifier = Modifier.weight(1f),
-                enabled = startDate.isNotEmpty() && condition != null
+            // Кнопки навигации
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Далее")
+                Button(
+                    onClick = { navController.popBackStack() },
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = Color.LightGray
+                    ),
+                    modifier = Modifier.weight(1f),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        "НАЗАД",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                
                 Spacer(modifier = Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = "Сохранить"
-                )
+                
+                Button(
+                    onClick = {
+                        viewModel.saveExpirationData(startDate, days, months, condition ?: "")
+                        navController.navigate("product_info")
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = startDate.isNotEmpty() && condition != null,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "ДАЛЕЕ",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = "Сохранить",
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
             }
+            
+            // Добавляем дополнительное пространство внизу для удобства прокрутки
+            Spacer(modifier = Modifier.height(8.dp))
         }
-        
-        // Добавляем дополнительное пространство внизу для удобства прокрутки
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }

@@ -23,11 +23,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.TextStyle
+
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -43,7 +47,7 @@ import kotlinx.coroutines.delay
 fun ScanLocationScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel,
-    pickViewModel: PickViewModel,
+    pickViewModel: PickViewModel = hiltViewModel(),
     spHelper: SPHelper
 ) {
     // Состояния
@@ -89,10 +93,8 @@ fun ScanLocationScreen(
                     locationId = scannedCode
                     pickViewModel.getLocationItems(locationId)
                 }
-                ScanMode.PRODUCT -> {
-                    Log.d("ScanLocationScreen", "Сканирован товар: $scannedCode")
-                    pickViewModel.searchProductByBarcode(scannedCode)
-                }
+
+                ScanMode.PRODUCT -> TODO()
             }
         }
     }
@@ -126,8 +128,9 @@ fun ScanLocationScreen(
             title = { 
                 Text(
                     "Снятие товара", 
-                    style = MaterialTheme.typography.subtitle1,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.subtitle2,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
                 ) 
             },
             text = {
@@ -135,15 +138,19 @@ fun ScanLocationScreen(
                     // Информация о товаре
                     Text(
                         text = selectedItem!!.name,
-                        style = MaterialTheme.typography.subtitle2,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     
                     Spacer(modifier = Modifier.height(2.dp))
                     
                     Text(
                         text = "Артикул: ${selectedItem!!.article}",
-                        style = MaterialTheme.typography.caption
+                        style = MaterialTheme.typography.caption,
+                        fontSize = 10.sp
                     )
                     
                     Spacer(modifier = Modifier.height(2.dp))
@@ -152,25 +159,27 @@ fun ScanLocationScreen(
                     val availableQuantity = if (selectedItem!!.units.isNotEmpty()) {
                         selectedItem!!.units[0].quantity
                     } else {
-                        selectedItem!!.quantity?.toString() ?: "Н/Д"
+                        selectedItem!!.units[0].quantity?.toString() ?: "Н/Д"
                     }
                     
                     Text(
                         text = "Доступное количество: $availableQuantity",
-                        style = MaterialTheme.typography.body2,
+                        style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colors.primary
+                        color = MaterialTheme.colors.primary,
+                        fontSize = 10.sp
                     )
                     
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     
                     // Поле ввода количества
                     Text(
                         text = "Введите количество для снятия:",
-                        style = MaterialTheme.typography.body2
+                        style = MaterialTheme.typography.caption,
+                        fontSize = 10.sp
                     )
                     
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     
                     TextField(
                         value = quantity,
@@ -181,10 +190,11 @@ fun ScanLocationScreen(
                                 validationError = null
                             }
                         },
-                        label = { Text("Количество") },
+                        label = { Text("Количество", fontSize = 10.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
                     )
                     
                     // Отображение ошибки валидации
@@ -203,7 +213,8 @@ fun ScanLocationScreen(
                             Text(
                                 text = it,
                                 color = MaterialTheme.colors.error,
-                                style = MaterialTheme.typography.caption
+                                style = MaterialTheme.typography.caption,
+                                fontSize = 10.sp
                             )
                         }
                     }
@@ -304,13 +315,11 @@ fun ScanLocationScreen(
                             val availableQuantity = if (selectedItem!!.units.isNotEmpty()) {
                                 selectedItem!!.units[0].quantity.toIntOrNull() ?: 0
                             } else {
-                                selectedItem!!.quantity ?: 0
+                                selectedItem!!.units[0].quantity ?: 0
                             }
                             
                             if (qnt <= 0) {
                                 validationError = "Количество должно быть больше нуля"
-                            } else if (qnt > availableQuantity) {
-                                validationError = "Недостаточно товара в ячейке"
                             } else {
                                 // Выполняем снятие товара
                                 Log.d("ScanLocationScreen", "Снятие товара: ${selectedItem!!.id}, количество: $qnt")
@@ -323,9 +332,10 @@ fun ScanLocationScreen(
                             validationError = "Введите количество"
                         }
                     },
-                    enabled = pickState !is PickState.Loading
+                    enabled = pickState !is PickState.Loading,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("ПОДТВЕРДИТЬ")
+                    Text("ПОДТВЕРДИТЬ", fontSize = 10.sp)
                 }
             },
             dismissButton = {
@@ -335,9 +345,10 @@ fun ScanLocationScreen(
                         quantity = ""
                         validationError = null
                     },
-                    enabled = pickState !is PickState.Loading
+                    enabled = pickState !is PickState.Loading,
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
-                    Text("ОТМЕНА")
+                    Text("ОТМЕНА", fontSize = 10.sp)
                 }
             }
         )
@@ -346,9 +357,17 @@ fun ScanLocationScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Снятие товара") },
+                title = { 
+                    Text(
+                        "Снятие товара",
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    ) 
+                },
                 backgroundColor = MaterialTheme.colors.primary,
-                contentColor = Color.White
+                contentColor = Color.White,
+                modifier = Modifier.height(44.dp)
             )
         }
     ) { paddingValues ->
@@ -357,7 +376,7 @@ fun ScanLocationScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(bottom = 0.dp) // Убираем отступ для нижней навигации
+                .padding(bottom = 0.dp)
         ) {
             // Индикатор прокрутки
             if (showScrollIndicator) {
@@ -383,85 +402,106 @@ fun ScanLocationScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp) // Уменьшаем горизонтальные отступы для маленького экрана
+                    .padding(horizontal = 8.dp)
                     .verticalScroll(scrollState),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(8.dp)) // Уменьшаем верхний отступ
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Переключатель режима сканирования
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    elevation = 2.dp
+                        .padding(vertical = 2.dp),
+                    elevation = 1.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(4.dp)
+                        modifier = Modifier.padding(2.dp)
                     ) {
                         Text(
                             text = "Режим сканирования",
                             style = MaterialTheme.typography.subtitle2,
                             fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                         
                         TabRow(
                             selectedTabIndex = scanMode.ordinal,
                             backgroundColor = MaterialTheme.colors.surface,
-                            contentColor = MaterialTheme.colors.primary
+                            contentColor = MaterialTheme.colors.primary,
+                            modifier = Modifier.height(30.dp)
                         ) {
                             Tab(
                                 selected = scanMode == ScanMode.LOCATION,
                                 onClick = { scanMode = ScanMode.LOCATION },
-                                text = { Text("Сканировать ячейку") }
-                            )
-                            Tab(
-                                selected = scanMode == ScanMode.PRODUCT,
-                                onClick = { scanMode = ScanMode.PRODUCT },
-                                text = { Text("Сканировать товар") }
+                                text = { 
+                                    Text(
+                                        "Сканировать ячейку",
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    ) 
+                                }
                             )
                         }
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp)) // Уменьшаем отступ между карточками
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Содержимое в зависимости от режима сканирования
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    elevation = 2.dp
+                        .padding(vertical = 2.dp),
+                    elevation = 1.dp
                 ) {
                     Column(
-                        modifier = Modifier.padding(8.dp) // Уменьшаем внутренний отступ
+                        modifier = Modifier.padding(6.dp)
                     ) {
                         when (scanMode) {
                             ScanMode.LOCATION -> {
                                 Text(
                                     text = "Отсканируйте или введите ШК ячейки",
-                                    style = MaterialTheme.typography.subtitle2, // Уменьшаем размер шрифта
-                                    fontWeight = FontWeight.Bold
+                                    style = MaterialTheme.typography.caption,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp)) // Уменьшаем отступ
+                                Spacer(modifier = Modifier.height(4.dp))
                                 
-                                OutlinedTextField(
-                                    value = locationId,
-                                    onValueChange = { locationId = it.trim() },
-                                    label = { Text("ШК ячейки") },
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    singleLine = true,
-                                    leadingIcon = {
-                                        Icon(
-                                            imageVector = Icons.Default.Search,
-                                            contentDescription = "Поиск"
-                                        )
-                                    }
-                                )
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = locationId,
+                                        onValueChange = { locationId = it.trim() },
+                                        label = { 
+                                            Text(
+                                                "ШК ячейки",
+                                                fontSize = 10.sp
+                                            ) 
+                                        },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Search,
+                                                contentDescription = "Поиск",
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                        }
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    
+                                    // Добавляем кнопку сканирования для TСД
+                                }
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 
                                 Button(
                                     onClick = {
@@ -471,7 +511,7 @@ fun ScanLocationScreen(
                                     },
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(48.dp),
+                                        .height(36.dp),
                                     enabled = locationId.isNotEmpty(),
                                     colors = ButtonDefaults.buttonColors(
                                         backgroundColor = MaterialTheme.colors.primary,
@@ -481,7 +521,7 @@ fun ScanLocationScreen(
                                     Text(
                                         "НАЙТИ ТОВАРЫ",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                             }
@@ -522,7 +562,7 @@ fun ScanLocationScreen(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(8.dp)) // Уменьшаем отступ между карточками
+                Spacer(modifier = Modifier.height(4.dp))
                 
                 // Отображение состояния загрузки или результатов
                 when (locationItemsState) {
@@ -530,20 +570,24 @@ fun ScanLocationScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp), // Уменьшаем отступ
-                            elevation = 2.dp // Уменьшаем тень
+                                .padding(vertical = 2.dp),
+                            elevation = 1.dp
                         ) {
                             Column(
                                 modifier = Modifier
-                                    .padding(12.dp) // Уменьшаем отступ
+                                    .padding(8.dp)
                                     .fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp)) // Уменьшаем размер индикатора
-                                Spacer(modifier = Modifier.height(4.dp)) // Уменьшаем отступ
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = "Загрузка товаров...",
-                                    style = MaterialTheme.typography.caption // Уменьшаем размер шрифта
+                                    style = MaterialTheme.typography.caption,
+                                    fontSize = 10.sp
                                 )
                             }
                         }
@@ -553,12 +597,12 @@ fun ScanLocationScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp), // Уменьшаем отступ
-                            elevation = 2.dp, // Уменьшаем тень
+                                .padding(vertical = 2.dp),
+                            elevation = 1.dp,
                             backgroundColor = Color(0xFFFFEBEE)
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp) // Уменьшаем отступ
+                                modifier = Modifier.padding(8.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
@@ -567,22 +611,24 @@ fun ScanLocationScreen(
                                         imageVector = Icons.Default.Error,
                                         contentDescription = "Ошибка",
                                         tint = MaterialTheme.colors.error,
-                                        modifier = Modifier.size(16.dp) // Уменьшаем размер иконки
+                                        modifier = Modifier.size(12.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp)) // Уменьшаем отступ
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Ошибка",
-                                        style = MaterialTheme.typography.subtitle2, // Уменьшаем размер шрифта
+                                        style = MaterialTheme.typography.caption,
                                         fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colors.error
+                                        color = MaterialTheme.colors.error,
+                                        fontSize = 10.sp
                                     )
                                 }
                                 
-                                Spacer(modifier = Modifier.height(4.dp)) // Уменьшаем отступ
+                                Spacer(modifier = Modifier.height(2.dp))
                                 
                                 Text(
                                     text = errorMessage,
-                                    style = MaterialTheme.typography.caption // Уменьшаем размер шрифта
+                                    style = MaterialTheme.typography.caption,
+                                    fontSize = 10.sp
                                 )
                             }
                         }
@@ -593,12 +639,12 @@ fun ScanLocationScreen(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 6.dp), // Уменьшаем отступ
-                            elevation = 2.dp, // Уменьшаем тень
+                                .padding(vertical = 2.dp),
+                            elevation = 1.dp,
                             backgroundColor = Color(0xFFE8F5E9)
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp) // Уменьшаем отступ
+                                modifier = Modifier.padding(8.dp)
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically
@@ -607,44 +653,47 @@ fun ScanLocationScreen(
                                         imageVector = Icons.Default.Check,
                                         contentDescription = "Успешно",
                                         tint = Color(0xFF4CAF50),
-                                        modifier = Modifier.size(16.dp) // Уменьшаем размер иконки
+                                        modifier = Modifier.size(12.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(4.dp)) // Уменьшаем отступ
+                                    Spacer(modifier = Modifier.width(4.dp))
                                     Text(
                                         text = "Найдено товаров: ${items.size}",
-                                        style = MaterialTheme.typography.subtitle2, // Уменьшаем размер шрифта
+                                        style = MaterialTheme.typography.caption,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF2E7D32)
+                                        color = Color(0xFF2E7D32),
+                                        fontSize = 10.sp
                                     )
                                 }
                             }
                         }
                         
-                        Spacer(modifier = Modifier.height(4.dp)) // Уменьшаем отступ между карточками товаров
+                        Spacer(modifier = Modifier.height(2.dp))
                         
                         if (items.isEmpty()) {
                             // Если товаров не найдено
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                elevation = 4.dp,
+                                    .padding(vertical = 4.dp),
+                                elevation = 2.dp,
                                 backgroundColor = MaterialTheme.colors.error.copy(alpha = 0.1f)
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(16.dp)
+                                    modifier = Modifier.padding(8.dp)
                                 ) {
                                     Text(
                                         text = "В ячейке не найдено товаров",
-                                        style = MaterialTheme.typography.h6,
-                                        fontWeight = FontWeight.Bold
+                                        style = MaterialTheme.typography.subtitle2,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
                                     )
                                     
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     
                                     Text(
                                         text = "Проверьте правильность ввода кода ячейки или отсканируйте ячейку повторно",
-                                        style = MaterialTheme.typography.body2
+                                        style = MaterialTheme.typography.caption,
+                                        fontSize = 10.sp
                                     )
                                 }
                             }
@@ -652,11 +701,12 @@ fun ScanLocationScreen(
                             // Отображаем список товаров
                             Text(
                                 text = "Товары в ячейке:",
-                                style = MaterialTheme.typography.subtitle1,
+                                style = MaterialTheme.typography.subtitle2,
                                 fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
+                                    .padding(vertical = 4.dp),
                                 textAlign = TextAlign.Start
                             )
                             
@@ -673,7 +723,7 @@ fun ScanLocationScreen(
                                     }
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                             }
                         }
                     }
@@ -681,7 +731,7 @@ fun ScanLocationScreen(
                 }
                 
                 // Добавляем минимальное пространство внизу для прокрутки
-                Spacer(modifier = Modifier.height(8.dp)) // Минимальный отступ внизу
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
@@ -698,44 +748,54 @@ fun ProductItemCard(item: LocationItem, onClick: () -> Unit) {
         shape = RoundedCornerShape(4.dp)
     ) {
         Column(
-            modifier = Modifier.padding(8.dp)
+            modifier = Modifier.padding(6.dp)
         ) {
             Text(
                 text = item.name,
                 style = MaterialTheme.typography.caption,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "Артикул: ${item.article}",
+                    text = "Арт: ${item.article}",
                     style = MaterialTheme.typography.caption,
-                    fontSize = 10.sp
+                    fontSize = 8.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
                 
                 Text(
-                    text = "Штрихкод: ${item.shk}",
+                    text = "ШК: ${item.shk}",
                     style = MaterialTheme.typography.caption,
-                    fontSize = 10.sp
+                    fontSize = 8.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.End
                 )
             }
             
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             
-            Divider()
+            Divider(thickness = 0.5.dp)
             
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             
             if (item.units.isNotEmpty()) {
                 Column {
                     item.units.forEachIndexed { index, unit ->
                         if (index > 0) {
-                            Divider(modifier = Modifier.padding(vertical = 2.dp))
+                            Divider(modifier = Modifier.padding(vertical = 1.dp), thickness = 0.5.dp)
                         }
                         
                         Row(
@@ -745,31 +805,50 @@ fun ProductItemCard(item: LocationItem, onClick: () -> Unit) {
                             Text(
                                 text = "Тип: ${unit.prunitName}",
                                 style = MaterialTheme.typography.caption,
-                                fontSize = 10.sp
+                                fontSize = 8.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
                             
                             Text(
                                 text = "Кол-во: ${unit.quantity}",
                                 style = MaterialTheme.typography.caption,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.End
                             )
                         }
                         
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(1.dp))
                         
-                        Text(
-                            text = "Состояние: ${unit.conditionState}",
-                            style = MaterialTheme.typography.caption,
-                            fontSize = 9.sp
-                        )
-                        
-                        if (unit.expirationDate != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             Text(
-                                text = "Срок годности: ${unit.expirationDate}",
+                                text = "Состояние: ${unit.conditionState}",
                                 style = MaterialTheme.typography.caption,
-                                fontSize = 9.sp
+                                fontSize = 7.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
                             )
+                            
+                            if (unit.expirationDate != null) {
+                                Text(
+                                    text = "Годен до: ${unit.expirationDate}",
+                                    style = MaterialTheme.typography.caption,
+                                    fontSize = 7.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.End
+                                )
+                            }
                         }
                     }
                 }
@@ -781,37 +860,61 @@ fun ProductItemCard(item: LocationItem, onClick: () -> Unit) {
                     Text(
                         text = "Доступное количество:",
                         style = MaterialTheme.typography.caption,
-                        fontSize = 10.sp
+                        fontSize = 8.sp
                     )
                     
                     Text(
-                        text = "${item.quantity ?: "Н/Д"}",
+                        text = "${item.units[0].quantity ?: "Н/Д"}",
                         style = MaterialTheme.typography.caption,
-                        fontSize = 10.sp,
+                        fontSize = 8.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             }
             
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             
             Button(
                 onClick = onClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(32.dp),
+                    .height(28.dp),
                 colors = ButtonDefaults.buttonColors(
                     backgroundColor = MaterialTheme.colors.primary,
                     contentColor = Color.White
-                )
+                ),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
                     "СНЯТЬ",
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
+    }
+}
+
+@Composable
+fun ScanButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(MaterialTheme.colors.primary)
+            .border(1.dp, MaterialTheme.colors.primary, RoundedCornerShape(4.dp))
+            .clickable(onClick = onClick)
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            painter = painterResource(id = android.R.drawable.ic_menu_camera),
+            contentDescription = "Сканировать",
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

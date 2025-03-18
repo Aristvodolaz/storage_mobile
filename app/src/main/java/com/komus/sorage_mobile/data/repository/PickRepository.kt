@@ -2,14 +2,18 @@ package com.komus.sorage_mobile.data.repository
 
 import android.util.Log
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.request.MoveProductRequest
 import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
 import com.komus.sorage_mobile.data.response.BaseResponse
 import com.komus.sorage_mobile.data.response.LocationItem
+import com.komus.sorage_mobile.data.response.LocationItemsResponse
+import com.komus.sorage_mobile.util.ProductMovementHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import javax.inject.Inject
 
 class PickRepository @Inject constructor(
@@ -19,7 +23,7 @@ class PickRepository @Inject constructor(
         try {
             Log.d("PickRepository", "Запрос товаров в ячейке: $locationId")
             val response = withContext(Dispatchers.IO) {
-                api.getLocationItems(locationId, locationId, sklad)
+                api.getLocationItems(locationId, sklad)
             }
             
             if (response.success) {
@@ -115,6 +119,44 @@ class PickRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара из ячейки с учетом склада: ${e.message}")
+            BaseResponse(success = false, message = e.message)
+        }
+    }
+    
+    suspend fun moveProduct(
+        productId: String,
+        sourceLocationId: String,
+        targetLocationId: String,
+        prunitId: String,
+        quantity: Int,
+        conditionState: String,
+        executor: String,
+        skladId: String,
+        expirationDate: String
+    ): BaseResponse {
+        // Обрабатываем дату через ProductMovementHelper для обеспечения ISO формата
+        val isoExpirationDate = ProductMovementHelper.processExpirationDate(expirationDate)
+        Timber.d("Перемещение товара с датой в ISO формате: $isoExpirationDate")
+        
+        val request = MoveProductRequest(
+            sourceLocationId = sourceLocationId,
+            targetLocationId = targetLocationId,
+            prunitId = prunitId,
+            quantity = quantity,
+            conditionState = conditionState,
+            executor = executor,
+            skladId = skladId,
+            expirationDate = isoExpirationDate,
+            productId = productId,
+            targetShk = targetLocationId
+        )
+        
+        return try {
+            val response = api.moveProduct(productId, request)
+            Timber.d("Результат перемещения товара: success=${response.success}, message=${response.message}")
+            response
+        } catch (e: Exception) {
+            Timber.e(e, "Ошибка при перемещении товара")
             BaseResponse(success = false, message = e.message)
         }
     }

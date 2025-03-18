@@ -7,6 +7,7 @@ import com.komus.sorage_mobile.data.repository.PlacementRepository
 import com.komus.sorage_mobile.data.repository.ProductSearchRepository
 import com.komus.sorage_mobile.domain.repository.AuthRepository
 import com.komus.sorage_mobile.domain.repository.SearchRepository
+import com.komus.sorage_mobile.util.SPHelper
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -25,8 +26,8 @@ object RepositoryModule {
 
     @Provides
     @Singleton
-    fun provideMovementRepository(apiService: StorageApi): MovementRepository {
-        return MovementRepository(apiService)
+    fun provideMovementRepository(apiService: StorageApi, spHelper: SPHelper): MovementRepository {
+        return MovementRepository(apiService, spHelper)
     }
     
     @Provides
@@ -37,8 +38,8 @@ object RepositoryModule {
     
     @Provides
     @Singleton
-    fun provideProductSearchRepository(apiService: StorageApi): ProductSearchRepository {
-        return ProductSearchRepository(apiService)
+    fun provideProductSearchRepository(apiService: StorageApi, spHelper: SPHelper): ProductSearchRepository {
+        return ProductSearchRepository(apiService, spHelper)
     }
     
     @Provides

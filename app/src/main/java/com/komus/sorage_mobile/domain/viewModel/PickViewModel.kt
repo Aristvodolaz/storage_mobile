@@ -5,12 +5,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.komus.sorage_mobile.data.response.LocationItem
 import com.komus.sorage_mobile.domain.state.LocationItemsState
+import com.komus.sorage_mobile.domain.state.MoveProductState
 import com.komus.sorage_mobile.domain.state.PickState
 import com.komus.sorage_mobile.domain.usecase.GetLocationItemsUseCase
+import com.komus.sorage_mobile.domain.usecase.MoveProductUseCase
 import com.komus.sorage_mobile.domain.usecase.PickFromLocationBySkladIdUseCase
 import com.komus.sorage_mobile.domain.usecase.PickFromLocationUseCase
 import com.komus.sorage_mobile.domain.usecase.PickProductUseCase
 import com.komus.sorage_mobile.domain.usecase.SearchUseCase
+import com.komus.sorage_mobile.util.DateUtils
+import com.komus.sorage_mobile.util.ProductMovementHelper
 import com.komus.sorage_mobile.util.SPHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +27,8 @@ import javax.inject.Inject
 @HiltViewModel
 class PickViewModel @Inject constructor(
     private val getLocationItemsUseCase: GetLocationItemsUseCase,
-    private val pickProductUseCase: PickProductUseCase,
-    private val pickFromLocationUseCase: PickFromLocationUseCase,
     private val pickFromLocationBySkladIdUseCase: PickFromLocationBySkladIdUseCase,
+    private val moveProductUseCase: MoveProductUseCase,
     private val searchUseCase: SearchUseCase,
     private val spHelper: SPHelper
 ) : ViewModel() {
@@ -36,11 +39,18 @@ class PickViewModel @Inject constructor(
     private val _pickState = MutableStateFlow<PickState>(PickState.Initial)
     val pickState: StateFlow<PickState> = _pickState.asStateFlow()
     
+    private val _moveProductState = MutableStateFlow<MoveProductState>(MoveProductState.Initial)
+    val moveProductState: StateFlow<MoveProductState> = _moveProductState.asStateFlow()
+    
     private var _selectedItem: LocationItem? = null
     val selectedItem: LocationItem? get() = _selectedItem
     
     // Добавляем переменную для хранения ID склада
     private var _skladId: String = ""
+    
+    // Добавляем переменные для хранения исходной и целевой ячеек
+    private var _sourceLocationId: String = ""
+    private var _targetLocationId: String = ""
     
     fun getLocationItems(locationId: String) {
         Log.d("PickViewModel", "Запрос товаров в ячейке: $locationId")
@@ -67,45 +77,7 @@ class PickViewModel @Inject constructor(
             }
         }
     }
-    
-    fun searchProductByBarcode(barcode: String) {
-        Log.d("PickViewModel", "Поиск товара по штрихкоду: $barcode")
-        _locationItemsState.value = LocationItemsState.Loading
-        
-        viewModelScope.launch {
-            searchUseCase.execute(shk = barcode, article = null).collectLatest { result ->
-                result.fold(
-                    onSuccess = { searchItems ->
-                        Log.d("PickViewModel", "Найдено ${searchItems.size} товаров по штрихкоду")
-                        if (searchItems.isEmpty()) {
-                            _locationItemsState.value = LocationItemsState.Error("Товар не найден")
-                        } else {
-                            // Преобразуем SearchItem в LocationItem для совместимости
-                            val locationItems = searchItems.map { searchItem ->
-                                LocationItem(
-                                    id = searchItem.ID,
-                                    name = searchItem.NAME,
-                                    article = searchItem.ARTICLE_ID_REAL,
-                                    shk = searchItem.SHK,
-                                    // Для обратной совместимости
-                                    productId = searchItem.ID,
-                                    barcode = searchItem.SHK
-                                )
-                            }
-                            _locationItemsState.value = LocationItemsState.Success(locationItems)
-                        }
-                    },
-                    onFailure = { error ->
-                        Log.e("PickViewModel", "Ошибка поиска товара: ${error.message}")
-                        _locationItemsState.value = LocationItemsState.Error(
-                            error.message ?: "Ошибка поиска товара"
-                        )
-                    }
-                )
-            }
-        }
-    }
-    
+
     fun selectItem(item: LocationItem) {
         _selectedItem = item
     }
@@ -114,101 +86,19 @@ class PickViewModel @Inject constructor(
         _skladId = skladId
     }
     
-    fun pickProduct(quantity: Int, executor: String) {
-        val item = _selectedItem ?: return
-        
-        Log.d("PickViewModel", "Снятие товара: ${item.productId}, количество: $quantity")
-        _pickState.value = PickState.Loading
-        
-        viewModelScope.launch {
-            try {
-                val response = item.productId?.let {
-                    item.wrShk?.let { it1 ->
-                        item.prunitId?.let { it2 ->
-                            pickProductUseCase(
-                                productId = it,
-                                locationId = it1, // Предполагаем, что locationId - это первая часть prunitId
-                                prunitId = it2,
-                                quantity = quantity,
-                                executor = executor
-                            )
-                        }
-                    }
-                }
 
-                if (response != null) {
-                    if (response.success) {
-                        Log.d("PickViewModel", "Товар успешно снят")
-                        _pickState.value = PickState.Success
-                    } else {
-                        Log.e("PickViewModel", "Ошибка снятия товара: ${response.message}")
-                        if (response != null) {
-                            _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("PickViewModel", "Исключение при снятии товара: ${e.message}")
-                _pickState.value = PickState.Error(e.message ?: "Произошла ошибка при снятии товара")
-            }
-        }
-    }
-    
-    fun pickFromLocation(quantity: Int, executor: String) {
-        val item = _selectedItem ?: return
-        val locationId = item.wrShk // Предполагаем, что locationId - это первая часть prunitId
-        
-        Log.d("PickViewModel", "Снятие товара из ячейки: ${item.productId}, ячейка: $locationId, количество: $quantity")
-        _pickState.value = PickState.Loading
-        
-        viewModelScope.launch {
-            try {
-                val skladId = if (_skladId.isNotEmpty()) _skladId else "85" // Используем значение по умолчанию, если не задано
-                
-                val response = item.productId?.let {
-                    item.prunitId?.let { it1 ->
-                        if (locationId != null) {
-                            pickFromLocationUseCase(
-                                productId = it,
-                                wrShk = locationId,
-                                prunitId = it1,
-                                quantity = quantity,
-                                executor = executor,
-                                skladId = skladId
-                            )
-                        } else null
-                    }
-                }
-
-                if (response != null) {
-                    if (response.success) {
-                        Log.d("PickViewModel", "Товар успешно снят из ячейки")
-                        _pickState.value = PickState.Success
-                    } else {
-                        Log.e("PickViewModel", "Ошибка снятия товара из ячейки: ${response.message}")
-                        _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки")
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e("PickViewModel", "Исключение при снятии товара из ячейки: ${e.message}")
-                _pickState.value = PickState.Error(e.message ?: "Произошла ошибка при снятии товара из ячейки")
-            }
-        }
-    }
     
     fun pickFromLocationBySkladId(quantity: Int, executor: String) {
         val item = _selectedItem ?: return
 
         
-        Log.d("PickViewModel", "Снятие товара из ячейки с учетом склада: ${item.id}, ячейка: ${item.locationId}, количество: $quantity")
+        Log.d("PickViewModel", "Снятие товара из ячейки с учетом склада: ${item.id}, количество: $quantity")
         _pickState.value = PickState.Loading
         
         viewModelScope.launch {
             try {
                 val skladId = if (_skladId.isNotEmpty()) _skladId else "85" // Используем значение по умолчанию, если не задано
-                
-                // Получаем ID ячейки из объекта товара
-                val locationIdStr = item.locationId?.toString() ?: "0"
+
                 
                 val response = item.wrShk?.let {
                     pickFromLocationBySkladIdUseCase(
@@ -243,5 +133,67 @@ class PickViewModel @Inject constructor(
     
     fun resetLocationItemsState() {
         _locationItemsState.value = LocationItemsState.Initial
+    }
+    
+    fun moveProduct(
+        quantity: Int,
+        conditionState: String,
+        executor: String,
+        expirationDate: String = "2025-01-14" // Значение по умолчанию
+    ) {
+        val item = _selectedItem ?: return
+        
+        if (_sourceLocationId.isEmpty() || _targetLocationId.isEmpty()) {
+            _moveProductState.value = MoveProductState.Error("Не указаны исходная или целевая ячейки")
+            return
+        }
+        
+        Log.d("PickViewModel", "Перемещение товара: ${item.id}, из ячейки: $_sourceLocationId в ячейку: $_targetLocationId, количество: $quantity")
+        _moveProductState.value = MoveProductState.Loading
+        
+        viewModelScope.launch {
+            try {
+                val skladId = if (_skladId.isNotEmpty()) _skladId else spHelper.getSkladId()
+                val prunitId = item.units.firstOrNull()?.prunitId?.toString() ?: "10"
+                
+                // ProductMovementHelper сам обработает преобразование даты внутри MoveProductUseCase
+                val response = moveProductUseCase(
+                    productId = item.id.toString(),
+                    sourceLocationId = _sourceLocationId,
+                    targetLocationId = _targetLocationId,
+                    prunitId = prunitId,
+                    quantity = quantity,
+                    conditionState = conditionState,
+                    executor = executor,
+                    skladId = skladId,
+                    expirationDate = expirationDate
+                )
+                
+                if (response.success) {
+                    Log.d("PickViewModel", "Товар успешно перемещен")
+                    _moveProductState.value = MoveProductState.Success
+                } else {
+                    Log.e("PickViewModel", "Ошибка перемещения товара: ${response.message}")
+                    _moveProductState.value = MoveProductState.Error(response.message ?: "Ошибка перемещения товара")
+                }
+            } catch (e: Exception) {
+                Log.e("PickViewModel", "Исключение при перемещении товара: ${e.message}")
+                _moveProductState.value = MoveProductState.Error(e.message ?: "Произошла ошибка при перемещении товара")
+            }
+        }
+    }
+    
+    fun setSourceLocation(locationId: String) {
+        _sourceLocationId = locationId
+        Log.d("PickViewModel", "Установлена исходная ячейка: $locationId")
+    }
+    
+    fun setTargetLocation(locationId: String) {
+        _targetLocationId = locationId
+        Log.d("PickViewModel", "Установлена целевая ячейка: $locationId")
+    }
+    
+    fun resetMoveProductState() {
+        _moveProductState.value = MoveProductState.Initial
     }
 } 

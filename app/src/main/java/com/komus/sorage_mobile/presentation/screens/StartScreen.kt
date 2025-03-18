@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
-import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ProductInfoScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanLocationScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanBufferLocationScreen
@@ -24,13 +23,10 @@ import com.komus.sorage_mobile.presentation.screens.razmechenie.UnitSelectionScr
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ExpirationDateScreen
 import com.komus.sorage_mobile.util.SPHelper
 import com.komus.sorage_mobile.util.Screen
-import com.komus.sorage_mobile.presentation.screens.peremischenie.ConfirmationScreen
-import com.komus.sorage_mobile.presentation.screens.peremischenie.ProductIdScreen
-import com.komus.sorage_mobile.presentation.screens.peremischenie.QuantityInputScreen
-import com.komus.sorage_mobile.presentation.screens.peremischenie.SourceLocationScreen
-import com.komus.sorage_mobile.presentation.screens.peremischenie.TargetLocationScreen
 import com.komus.sorage_mobile.presentation.screens.search.ProductSearchScreen
 import com.komus.sorage_mobile.presentation.screens.snyatie.ScanLocationScreen as SnyatieScanLocationScreen
+import com.komus.sorage_mobile.presentation.screens.movement.ScanSourceLocationScreen
+import com.komus.sorage_mobile.presentation.screens.info.ProductInfoScreen
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -40,9 +36,19 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import android.os.Build
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.komus.sorage_mobile.domain.viewModel.PickViewModel
-import com.komus.sorage_mobile.domain.viewModel.PlacementViewModel
+import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.components.TopConnectionStatusBar
+
+object Routes {
+    const val AUTH = "auth"
+    const val MAIN = "inventory"
+    const val PLACEMENT = "placement"
+    const val PLACEMENT_SCAN_LOCATION = "placement_scan_location"
+    const val PLACEMENT_SCAN_PRODUCT = "placement_scan_product"
+    const val PLACEMENT_EXPIRATION_DATE = "placement_expiration_date"
+    const val SNYATIE_SCAN_LOCATION = "snyatie_scan_location"
+    const val MOVE_PRODUCT = "move_product"
+}
 
 @Composable
 fun MainScreen(spHelper: SPHelper,
@@ -55,7 +61,7 @@ fun MainScreen(spHelper: SPHelper,
     ) {
         Scaffold(
             topBar = { 
-                // Добавляем отступ для системной статус-бары
+                // Добавляем отступ для системной статус-бары и показываем TopBar
                 Box(
                     modifier = Modifier.windowInsetsPadding(WindowInsets.statusBars)
                 ) {
@@ -63,24 +69,17 @@ fun MainScreen(spHelper: SPHelper,
                 }
             },
             bottomBar = { 
-                // Добавляем отступ для системной навигации
+                // Добавляем отступ для системной навигации и показываем BottomBar
                 Box(
                     modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
                 ) {
                     BottomNavigationBar(navController)
                 }
             },
-            // Отключаем встроенные отступы Scaffold, чтобы управлять ими вручную
+            // Отключаем встроенные отступы Scaffold
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { paddingValues ->
-            // Используем padding из paddingValues для корректного отображения контента
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                NavigationGraph(navController, spHelper, scannerViewModel)
-            }
+            NavigationGraph(navController, paddingValues, scannerViewModel, spHelper)
         }
     }
 }
@@ -115,91 +114,96 @@ fun BottomNavigationBar(navController: NavController) {
     }
 }
 @Composable
-fun NavigationGraph(navController: NavHostController,
-                    spHelper: SPHelper,
-                    scannerViewModel: ScannerViewModel) {
-    NavHost(navController, startDestination = Screen.Inventory.route) {
-        composable(Screen.Inventory.route) { ScreenContent("Инвентаризация") }
-
-        composable(Screen.Placement.route){
-            SearchScreen(
-                navController = navController,
-                scannerViewModel = scannerViewModel,
-                spHelper = spHelper
-            ) {}
-        }
-        
-        // Экран снятия товара
-        composable(Screen.Removal.route) {
-            val pickViewModel = hiltViewModel<PickViewModel>()
-            SnyatieScanLocationScreen(
-                navController = navController, 
-                scannerViewModel = scannerViewModel, 
-                pickViewModel = pickViewModel, 
-                spHelper = spHelper
+fun NavigationGraph(
+    navController: NavHostController,
+    paddingValues: PaddingValues,
+    scannerViewModel: ScannerViewModel,
+    spHelper: SPHelper
+) {
+    // Учитываем paddingValues для отступов контента от верхней и нижней части экрана
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                top = paddingValues.calculateTopPadding(),
+                bottom = paddingValues.calculateBottomPadding()
             )
-        }
-        
-        // Экран перемещения товара
-        composable(Screen.Movement.route) { 
-            ProductIdScreen(navController = navController, scannerViewModel = scannerViewModel, spHelper = spHelper)
-        }
-        
-        composable(Screen.Info.route) { 
-            ProductSearchScreen(navController = navController, scannerViewModel = scannerViewModel)
-        }
+    ) {
+        NavHost(
+            navController = navController,
+            startDestination = Screen.Inventory.route,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            composable(Screen.Inventory.route) { ScreenContent("Инвентаризация") }
 
-        composable("search_results/{query}") { backStackEntry ->
-            val query = backStackEntry.arguments?.getString("query") ?: ""
-            UnitSelectionScreen(navController, productId =  query, spHelper)
-        }
+            composable(Screen.Placement.route){
+                SearchScreen(
+                    navController = navController,
+                    scannerViewModel = scannerViewModel,
+                    spHelper = spHelper
+                ) {}
+            }
+            
+            // Экран снятия товара
+            composable(Screen.Removal.route) {
+                SnyatieScanLocationScreen(
+                    navController = navController, 
+                    scannerViewModel = scannerViewModel,
+                    spHelper = spHelper
+                )
+            }
+            
+            // Экран перемещения товара
+            composable(Screen.Movement.route) {
+                ScanSourceLocationScreen(navController, scannerViewModel)
+            }
+            
+            composable(Screen.Info.route) { 
+                ProductInfoScreen(navController = navController, scannerViewModel = scannerViewModel)
+            }
 
-        composable("product_info") { 
-            val placementViewModel = hiltViewModel<PlacementViewModel>()
-            ProductInfoScreen(navController, spHelper, placementViewModel) 
-        }
-        
-        composable("scan_ir_location") { 
-            ScanLocationScreen(navController, spHelper, scannerViewModel) 
-        }
-        
-        composable("scan_buffer_location") { 
-            val placementViewModel = hiltViewModel<PlacementViewModel>()
-            ScanBufferLocationScreen(navController, spHelper, scannerViewModel, placementViewModel) 
-        }
-        
-        // Экран срока годности
-        composable("expiration_date") { 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ExpirationDateScreen(navController)
-            } else {
-                // Для устройств с API ниже 26 (Android 8.0)
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Эта функция требует Android 8.0 или выше")
+            composable("search_results/{query}") { backStackEntry ->
+                val query = backStackEntry.arguments?.getString("query") ?: ""
+                UnitSelectionScreen(navController, productId =  query, spHelper = spHelper)
+            }
+
+            composable("product_info") {
+                ProductInfoScreen(navController, spHelper = spHelper)
+            }
+            
+            composable("scan_ir_location") { 
+                ScanLocationScreen(navController, spHelper = spHelper, scannerViewModel)
+            }
+            
+            composable("scan_buffer_location") {
+                ScanBufferLocationScreen(navController, spHelper = spHelper, scannerViewModel)
+            }
+            
+            // Экран срока годности
+            composable("expiration_date") { 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    ExpirationDateScreen(navController)
+                } else {
+                    // Для устройств с API ниже 26 (Android 8.0)
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Эта функция требует Android 8.0 или выше")
+                    }
                 }
             }
-        }
-        
-        // Экраны для перемещения товара
-        composable("product_id_input") { 
-            ProductIdScreen(navController = navController, scannerViewModel = scannerViewModel, spHelper = spHelper)
-        }
-        composable("scan_source_location") { 
-            SourceLocationScreen(navController = navController, scannerViewModel = scannerViewModel, spHelper = spHelper)
-        }
-        composable("quantity_input") { 
-            QuantityInputScreen(navController = navController, spHelper = spHelper)
-        }
-        composable("scan_target_location") { 
-            TargetLocationScreen(navController = navController, scannerViewModel = scannerViewModel, spHelper = spHelper)
-        }
-        composable("confirmation") { 
-            ConfirmationScreen(navController = navController, spHelper = spHelper)
-        }
 
-        // Экран поиска товаров
-        composable("product_search") {
-            ProductSearchScreen(navController = navController, scannerViewModel = scannerViewModel)
+            // Экран поиска товаров
+            composable("product_search") {
+                ProductSearchScreen(navController = navController, scannerViewModel = scannerViewModel)
+            }
+
+            composable(Routes.MOVE_PRODUCT) {
+                ScanSourceLocationScreen(
+                    navController = navController,
+                    scannerViewModel = scannerViewModel
+                )
+            }
+
+
         }
     }
 }
@@ -216,52 +220,4 @@ fun ScreenContent(title: String) {
 fun currentRoute(navController: NavController): String? {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     return navBackStackEntry?.destination?.route
-}
-
-@Composable
-fun StartScreen(
-    navController: NavController,
-    spHelper: SPHelper,
-    scannerViewModel: ScannerViewModel,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Button(
-            onClick = { navController.navigate("scan_storage_location") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(56.dp)
-        ) {
-            Text("Снятие")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { navController.navigate("placement") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(56.dp)
-        ) {
-            Text("Размещение")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = { navController.navigate("movement") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(56.dp)
-        ) {
-            Text("Перемещение")
-        }
-    }
 }

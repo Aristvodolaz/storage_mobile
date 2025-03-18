@@ -2,7 +2,10 @@ package com.komus.sorage_mobile.data.repository
 
 import android.util.Log
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.response.LocationProductsResponse
+import com.komus.sorage_mobile.data.response.ProductInfoResponse
 import com.komus.sorage_mobile.data.response.ProductItem
+import com.komus.sorage_mobile.util.SPHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -10,7 +13,8 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class ProductSearchRepository @Inject constructor(
-    private val api: StorageApi
+    private val api: StorageApi,
+    private val spHelper: SPHelper
 ) {
     suspend fun searchProducts(query: String): Flow<Result<List<ProductItem>>> = flow {
         try {
@@ -35,5 +39,27 @@ class ProductSearchRepository @Inject constructor(
             Log.e("ProductSearchRepository", "Исключение при поиске товаров: ${e.message}")
             emit(Result.failure(e))
         }
+    }
+
+    suspend fun searchProductsByLocationId(locationId: String): LocationProductsResponse {
+        val skladId = spHelper.getSkladId()
+        return api.getLocationProducts(locationId = locationId, skladId = skladId.toInt())
+    }
+    
+    suspend fun searchProductsByLocationName(locationName: String): LocationProductsResponse {
+        // В текущем API нет метода для поиска по имени ячейки, поэтому используем 
+        // searchProductsByLocationId, предполагая, что имя может совпадать с ID
+        val skladId = spHelper.getSkladId()
+        return api.getLocationProducts(locationId = locationName, skladId = skladId.toInt())
+    }
+    
+    suspend fun searchProductsByArticle(article: String): ProductInfoResponse {
+        val skladId = spHelper.getSkladId()
+        return api.getProductInfo(article = article, skladId = skladId.toInt())
+    }
+    
+    suspend fun searchProductsByBarcode(barcode: String): ProductInfoResponse {
+        val skladId = spHelper.getSkladId()
+        return api.getProductInfo(shk = barcode,skladId = skladId.toInt())
     }
 } 
