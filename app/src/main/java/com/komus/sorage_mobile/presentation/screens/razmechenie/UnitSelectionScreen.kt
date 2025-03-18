@@ -66,7 +66,7 @@ fun UnitSelectionScreen(
                 .padding(paddingValues)
                 .padding(horizontal = 8.dp, vertical = 4.dp)
         ) {
-            when (unitState) {
+        when (unitState) {
                 is UnitState.Loading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -78,8 +78,8 @@ fun UnitSelectionScreen(
                         )
                     }
                 }
-                is UnitState.Success -> {
-                    val units = (unitState as UnitState.Success).data
+            is UnitState.Success -> {
+                val units = (unitState as UnitState.Success).data
                     
                     if (!showQuantityInput) {
                         // Экран выбора единицы хранения
@@ -116,7 +116,7 @@ fun UnitSelectionScreen(
                                     shape = RoundedCornerShape(4.dp),
                                     backgroundColor = if (selectedUnit == unit) Color(0xFFE0E0FF) else MaterialTheme.colors.surface
                                 ) {
-                                    Button(
+                        Button(
                                         onClick = { 
                                             selectedUnit = unit
                                             showQuantityInput = true
@@ -284,17 +284,17 @@ fun UnitSelectionScreen(
                             
                             Spacer(modifier = Modifier.width(4.dp))
                             
-                            Button(
-                                onClick = {
-                                    selectedUnit?.let {
-                                        if(quantity.isNotEmpty()) {
-                                            val fullQnt = quantity.toInt() * selectedUnit!!.productQnt
+                    Button(
+                        onClick = {
+                            selectedUnit?.let {
+                                if(quantity.isNotEmpty()) {
+                                    val fullQnt = quantity.toInt() * selectedUnit!!.productQnt
                                             // Сохраняем информацию о единице хранения
                                             spHelper.saveBrief(selectedUnit!!.type.toString())
                                             // Сохраняем артикул товара
                                             spHelper.saveProductId(productId)
                                             // Сохраняем количество
-                                            spHelper.saveFullQnt(fullQnt)
+                                    spHelper.saveFullQnt(fullQnt)
                                             // Переходим на экран ExprationDate
                                             navController.navigate("expiration_date")
                                         }

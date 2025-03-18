@@ -4,6 +4,7 @@ import com.komus.sorage_mobile.data.request.MoveProductRequest
 import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
 import com.komus.sorage_mobile.data.request.PlaceProductRequest
+import com.komus.sorage_mobile.data.response.ArticleInventoryResponse
 import com.komus.sorage_mobile.data.response.AuthResponse
 import com.komus.sorage_mobile.data.response.BaseResponse
 import com.komus.sorage_mobile.data.response.InventoryItemResponse
@@ -84,7 +85,7 @@ interface StorageApi {
     @GET("/api/storage/inventory/location/{locationId}")
     suspend fun getLocationProducts(
         @Path("locationId") locationId: String,
-        @Query("sklad_id") skladId: Int? = null
+        @Query("sklad_id") skladId: Int
     ): LocationProductsResponse
     
     @GET("/api/storage/article-info")
@@ -93,40 +94,18 @@ interface StorageApi {
         @Query("shk") shk: String? = null,
         @Query("id_sklad") skladId: Int? = null
     ): ProductInfoResponse
+
     
-    @GET("storage/location-items/{locationId}")
+    @GET("/api/storage/location-items/{locationId}")
     suspend fun getLocationItems(
         @Path("locationId") locationId: String,
-        @Query("wrShk") wrShk: String,
         @Query("id_sklad") id_sklad: Int
     ): LocationItemsResponse
 
-    @GET("/api/storage/inventory/article/{article}")
+    @GET("/api/storage/article-info")
     suspend fun getInventoryItemByArticle(
-        @Path("article") article: String,
-        @Query("sklad_id") skladId: String? = null
-    ): InventoryItemResponse
-
-    @GET("/api/storage/inventory/barcode/{barcode}")
-    suspend fun getInventoryItemByBarcode(
-        @Path("barcode") barcode: String,
-        @Query("sklad_id") skladId: String? = null
-    ): InventoryItemResponse
-
-    @GET("/api/storage/inventory/location/{locationId}")
-    suspend fun getInventoryItemsByLocation(
-        @Path("locationId") locationId: String,
-        @Query("sklad_id") skladId: String? = null
-    ): LocationInventoryResponse
-
-    @PUT("/api/storage/inventory/update")
-    suspend fun updateInventoryItem(
-        @Body request: UpdateInventoryRequest
-    ): BaseResponse
-
-    @POST("/api/storage/inventory/sync")
-    suspend fun syncInventoryResults(
-        @Body request: SyncInventoryRequest
-    ): BaseResponse
+        @Query("article") article: String,
+        @Query("id_sklad") skladId: String
+    ): ArticleInventoryResponse
 
 }

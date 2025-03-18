@@ -1,6 +1,7 @@
 package com.komus.sorage_mobile.di
 
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.repository.InventoryRepository
 import com.komus.sorage_mobile.data.repository.MovementRepository
 import com.komus.sorage_mobile.data.repository.PickRepository
 import com.komus.sorage_mobile.data.repository.PlacementRepository
@@ -52,5 +53,11 @@ object RepositoryModule {
     @Singleton
     fun providePlacementRepository(apiService: StorageApi): PlacementRepository {
         return PlacementRepository(apiService)
+    }
+
+    @Provides
+    @Singleton
+    fun provideInventoryRepository(api: StorageApi, spHelper: SPHelper): InventoryRepository {
+        return InventoryRepository(api, spHelper)
     }
 }

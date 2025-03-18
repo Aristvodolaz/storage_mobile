@@ -27,6 +27,7 @@ import com.komus.sorage_mobile.presentation.screens.search.ProductSearchScreen
 import com.komus.sorage_mobile.presentation.screens.snyatie.ScanLocationScreen as SnyatieScanLocationScreen
 import com.komus.sorage_mobile.presentation.screens.movement.ScanSourceLocationScreen
 import com.komus.sorage_mobile.presentation.screens.info.ProductInfoScreen
+import com.komus.sorage_mobile.presentation.screens.inventory.InventoryScreen
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
@@ -134,7 +135,9 @@ fun NavigationGraph(
             startDestination = Screen.Inventory.route,
             modifier = Modifier.fillMaxSize()
         ) {
-            composable(Screen.Inventory.route) { ScreenContent("Инвентаризация") }
+            composable(Screen.Inventory.route) {
+             InventoryScreen(scannerViewModel = scannerViewModel)
+            }
 
             composable(Screen.Placement.route){
                 SearchScreen(

@@ -32,4 +32,6 @@ object AppModule {
     fun provideNetworkUtils(@ApplicationContext context: Context): NetworkUtils {
         return NetworkUtils(context)
     }
+
+
 } 

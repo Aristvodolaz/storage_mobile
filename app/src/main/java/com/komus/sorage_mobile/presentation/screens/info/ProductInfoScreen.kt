@@ -498,6 +498,7 @@ fun CompactProductLocationCard(location: ProductLocation) {
                     value = location.quantity?.toString() ?: "0", 
                     modifier = Modifier.weight(1f)
                 )
+
             }
             
             // Срок годности и состояние в одну строку, если они есть
