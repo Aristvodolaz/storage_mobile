@@ -160,7 +160,8 @@ class MovementViewModel @Inject constructor(
                     conditionState = unit.conditionState,
                     expirationDate = unit.expirationDate ?: ProductMovementHelper.DEFAULT_EXPIRATION_DATE,
                     executor = spHelper.getUserName() ?: "Пользователь",
-                    prunitId = unit.prunitId.toString()
+                    prunitId = unit.prunitId.toString(),
+                    productQnt = spHelper.getProductQnt().toString()
                 )
                 
                 if (response.success) {

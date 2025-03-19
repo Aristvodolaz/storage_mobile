@@ -132,7 +132,8 @@ class PickRepository @Inject constructor(
         conditionState: String,
         executor: String,
         skladId: String,
-        expirationDate: String
+        expirationDate: String,
+        productQnt:String
     ): BaseResponse {
         // Обрабатываем дату через ProductMovementHelper для обеспечения ISO формата
         val isoExpirationDate = ProductMovementHelper.processExpirationDate(expirationDate)
@@ -148,7 +149,8 @@ class PickRepository @Inject constructor(
             skladId = skladId,
             expirationDate = isoExpirationDate,
             productId = productId,
-            targetShk = targetLocationId
+            targetShk = targetLocationId,
+            productQnt = productQnt
         )
         
         return try {

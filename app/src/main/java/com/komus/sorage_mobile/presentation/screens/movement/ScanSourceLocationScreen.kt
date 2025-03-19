@@ -36,13 +36,15 @@ import com.komus.sorage_mobile.domain.viewModel.MovementViewModel
 import com.komus.sorage_mobile.presentation.components.LoadingIndicator
 import com.komus.sorage_mobile.presentation.components.ScanButton
 import com.komus.sorage_mobile.presentation.theme.Primary
+import com.komus.sorage_mobile.util.SPHelper
 
 private const val TAG = "ScanSourceLocationScreen"
 @Composable
 fun ScanSourceLocationScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel,
-    movementViewModel: MovementViewModel = hiltViewModel()
+    movementViewModel: MovementViewModel = hiltViewModel(),
+    spHelper: SPHelper
 ) {
     var locationId by remember { mutableStateOf("") }
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
@@ -240,6 +242,7 @@ fun ScanSourceLocationScreen(
             onConfirm = { quantity ->
                 movementViewModel.selectItem(selectedItem!!)
                 movementViewModel.setMoveQuantity(quantity)
+                spHelper.saveProductQnt(selectedItem!!.units[0].productQnt.toInt())
                 moveQuantity = quantity
                 showQuantityDialog = false
                 showTargetLocationDialog = true

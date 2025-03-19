@@ -12,6 +12,6 @@ data class MoveProductRequest(
     @SerializedName("expirationDate") val expirationDate: String,
     @SerializedName("executor") val executor: String,
     @SerializedName("id_sklad") val skladId: String,
-    @SerializedName("productId") val productId: String
-
+    @SerializedName("productId") val productId: String,
+    @SerializedName("productQnt") val productQnt: String
     )

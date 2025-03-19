@@ -29,7 +29,8 @@ class MovementRepository @Inject constructor(
         conditionState: String,
         expirationDate: String,
         executor: String,
-        prunitId: String
+        prunitId: String,
+        productQnt: String
     ): BaseResponse {
         val skladId = spHelper.getSkladId()
         
@@ -47,7 +48,8 @@ class MovementRepository @Inject constructor(
             executor = executor,
             skladId = skladId,
             productId = productId,
-            targetShk = targetLocationId
+            targetShk = targetLocationId,
+            productQnt = productQnt
         )
         
         return api.moveProduct(productId, request)

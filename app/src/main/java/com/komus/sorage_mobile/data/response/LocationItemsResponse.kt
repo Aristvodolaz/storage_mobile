@@ -14,7 +14,8 @@ data class ItemUnit(
     @SerializedName("prunitName") val prunitName: String,
     @SerializedName("quantity") val quantity: String,
     @SerializedName("conditionState") val conditionState: String,
-    @SerializedName("expirationDate") val expirationDate: String? = null
+    @SerializedName("expirationDate") val expirationDate: String? = null,
+    @SerializedName("productQnt") val productQnt: String
 )
 
 data class LocationItem(
