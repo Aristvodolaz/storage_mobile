@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.util.Log
 
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
@@ -148,6 +149,54 @@ class InventoryViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         errorMessage = e.message ?: "Ошибка при обновлении количества товара",
+                        showDetailsDialog = false,
+                        showUpdateDialog = false
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * Обновление данных товара
+     */
+    fun updateItem(
+        newQuantity: Int,
+        newExpirationDate: String,
+        newCondition: String,
+        newReason: String?
+    ) {
+        val selectedItem = _uiState.value.selectedItem ?: return
+
+        if (newQuantity < 0) {
+            _uiState.update { it.copy(errorMessage = "Количество не может быть отрицательным") }
+            return
+        }
+
+        if (newCondition == "Некондиция" && newReason.isNullOrEmpty()) {
+            _uiState.update { it.copy(errorMessage = "Необходимо указать причину некондиции") }
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                Log.d("InventoryViewModel", "Обновление товара: количество=$newQuantity, срок годности=$newExpirationDate, состояние=$newCondition, причина=$newReason")
+                
+                val updatedItem = repository.updateItem(
+                    selectedItem,
+                    newQuantity,
+                    newExpirationDate,
+                    newCondition,
+                    newReason
+                )
+                
+                updateItemInList(updatedItem)
+                _uiState.update { it.copy(updateSuccess = true) }
+                hideDialogs()
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        errorMessage = e.message ?: "Ошибка при обновлении товара",
                         showDetailsDialog = false,
                         showUpdateDialog = false
                     )

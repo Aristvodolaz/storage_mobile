@@ -27,6 +27,7 @@ import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.OutlinedTextField
+import androidx.compose.material.RadioButton
 import androidx.compose.material.Scaffold
 import androidx.compose.material.Snackbar
 import androidx.compose.material.SnackbarHost
@@ -293,7 +294,7 @@ fun InventoryScreen(
     if (uiState.showUpdateDialog && uiState.selectedItem != null) {
         UpdateQuantityDialog(
             item = uiState.selectedItem!!,
-            onUpdate = { newQuantity -> viewModel.updateItemQuantity(newQuantity) },
+            onUpdate = { newQuantity, newExpirationDate, newCondition, newReason -> viewModel.updateItem(newQuantity, newExpirationDate, newCondition, newReason) },
             onDismiss = { viewModel.hideDialogs() }
         )
     }
@@ -406,38 +407,62 @@ fun ItemDetailsDialog(
         title = { Text("Информация о товаре", fontSize = 16.sp) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
-                InfoRow("Наименование:", item.name)
-                InfoRow("Артикул:", item.article)
-                InfoRow("Штрих-код:", item.barcode)
-                InfoRow("ID ячейки:", item.locationId)
-                
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                InfoRow(
-                    label = "Количество:", 
-                    value = "${item.actualQuantity} шт.",
-                    valueColor = if (item.actualQuantity != item.expectedQuantity) 
-                        MaterialTheme.colors.error 
-                    else 
-                        MaterialTheme.colors.onSurface
+                Text(
+                    text = item.name,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
                 
-                if (item.actualQuantity != item.expectedQuantity) {
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                InfoRow(
+                    label = "Артикул:",
+                    value = item.article
+                )
+                
+                InfoRow(
+                    label = "Штрихкод:",
+                    value = item.barcode
+                )
+                
+                InfoRow(
+                    label = "Ячейка:",
+                    value = item.locationName.ifEmpty { item.locationId }
+                )
+                
+                InfoRow(
+                    label = "Ожидаемое кол-во:",
+                    value = "${item.expectedQuantity} шт."
+                )
+                
+                InfoRow(
+                    label = "Фактическое кол-во:",
+                    value = "${item.actualQuantity} шт.",
+                    valueColor = if (item.actualQuantity != item.expectedQuantity) 
+                        MaterialTheme.colors.error else MaterialTheme.colors.onSurface
+                )
+
+                InfoRow(
+                    label = "Срок годности:",
+                    value = item.expirationDate.ifEmpty { "Не указан" }
+                )
+
+                InfoRow(
+                    label = "Состояние:",
+                    value = item.condition,
+                    valueColor = if (item.condition == "Некондиция") 
+                        MaterialTheme.colors.error else MaterialTheme.colors.onSurface
+                )
+
+                if (item.condition == "Некондиция" && !item.reason.isNullOrEmpty()) {
                     InfoRow(
-                        label = "Ожидаемое количество:",
-                        value = "${item.expectedQuantity} шт.",
+                        label = "Причина некондиции:",
+                        value = item.reason,
                         valueColor = MaterialTheme.colors.error
                     )
                 }
-                
-                Divider(modifier = Modifier.padding(vertical = 8.dp))
-                
-                Text(
-                    text = "Статус: ${if (item.isChecked) "Проверено" else "Не проверено"}",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (item.isChecked) Color(0xFF4CAF50) else Color.Gray
-                )
             }
         },
         buttons = {
@@ -480,15 +505,19 @@ fun ItemDetailsDialog(
 @Composable
 fun UpdateQuantityDialog(
     item: InventoryItem,
-    onUpdate: (Int) -> Unit,
+    onUpdate: (Int, String, String, String?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var quantity by remember { mutableStateOf(item.actualQuantity.toString()) }
+    var expirationDate by remember { mutableStateOf(item.expirationDate) }
+    var condition by remember { mutableStateOf(item.condition) }
+    var reason by remember { mutableStateOf(item.reason ?: "") }
+    var showReasonError by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Изменить количество", fontSize = 16.sp) },
+        title = { Text("Изменить данные товара", fontSize = 16.sp) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -518,34 +547,115 @@ fun UpdateQuantityDialog(
                 
                 OutlinedTextField(
                     value = quantity,
-                    onValueChange = { 
-                        // Разрешаем только цифры
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            quantity = it
-                        }
-                    },
+                    onValueChange = { quantity = it },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number,
                         imeAction = ImeAction.Done
                     ),
                     keyboardActions = KeyboardActions(
-                        onDone = {
-                            keyboardController?.hide()
-                            quantity.toIntOrNull()?.let { onUpdate(it) }
-                        }
+                        onDone = { keyboardController?.hide() }
                     ),
-                    modifier = Modifier.fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.body1.copy(fontSize = 14.sp)
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
-                
-                if (item.expectedQuantity != quantity.toIntOrNull()) {
-                    Spacer(modifier = Modifier.height(8.dp))
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Срок годности (дд.мм.гггг):",
+                    fontSize = 12.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = expirationDate,
+                    onValueChange = { expirationDate = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Состояние товара:",
+                    fontSize = 12.sp
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        RadioButton(
+                            selected = condition == "Кондиция",
+                            onClick = { 
+                                condition = "Кондиция"
+                                showReasonError = false
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "Кондиция",
+                            fontSize = 12.sp
+                        )
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        RadioButton(
+                            selected = condition == "Некондиция",
+                            onClick = { 
+                                condition = "Некондиция"
+                                showReasonError = reason.isEmpty()
+                            },
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "Некондиция",
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                if (condition == "Некондиция") {
+                    Spacer(modifier = Modifier.height(16.dp))
                     
                     Text(
-                        text = "Ожидаемое количество: ${item.expectedQuantity} шт.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colors.error
+                        text = "Причина некондиции:",
+                        fontSize = 12.sp
                     )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = { 
+                            reason = it
+                            showReasonError = it.isEmpty()
+                        },
+                        isError = showReasonError,
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    if (showReasonError) {
+                        Text(
+                            text = "Укажите причину некондиции",
+                            color = MaterialTheme.colors.error,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+                    }
                 }
             }
         },
@@ -564,8 +674,17 @@ fun UpdateQuantityDialog(
                 
                 Button(
                     onClick = {
+                        if (condition == "Некондиция" && reason.isEmpty()) {
+                            showReasonError = true
+                            return@Button
+                        }
                         quantity.toIntOrNull()?.let { 
-                            onUpdate(it)
+                            onUpdate(
+                                it,
+                                expirationDate,
+                                condition,
+                                if (condition == "Некондиция") reason else null
+                            )
                             keyboardController?.hide()
                         }
                     }

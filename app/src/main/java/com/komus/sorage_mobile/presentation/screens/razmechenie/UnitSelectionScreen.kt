@@ -293,6 +293,7 @@ fun UnitSelectionScreen(
                                             spHelper.saveBrief(selectedUnit!!.type.toString())
                                             // Сохраняем артикул товара
                                             spHelper.saveProductId(productId)
+                                    spHelper.saveProductQnt(selectedUnit!!.productQnt)
                                             // Сохраняем количество
                                     spHelper.saveFullQnt(fullQnt)
                                             // Переходим на экран ExprationDate

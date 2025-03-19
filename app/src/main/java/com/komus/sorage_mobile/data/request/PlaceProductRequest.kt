@@ -12,5 +12,7 @@ data class PlaceProductRequest(
     @SerializedName("name") val name: String? = null,
     @SerializedName("shk") val shk: String? = null,
     @SerializedName("article") val article: String? = null,
-    @SerializedName("sklad_id") val skladId: String? = null
+    @SerializedName("sklad_id") val skladId: String? = null,
+    @SerializedName("reason") val reason: String? = "",
+    @SerializedName("productQnt") val productQnt: Int
 ) 

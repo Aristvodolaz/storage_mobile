@@ -12,5 +12,8 @@ data class InventoryItem(
     val locationName: String,
     val expectedQuantity: Int,
     val actualQuantity: Int = expectedQuantity,
-    val isChecked: Boolean = false
+    val isChecked: Boolean = false,
+    val expirationDate: String = "",
+    val condition: String = "Кондиция",
+    val reason: String? = null
 ) 

@@ -24,6 +24,13 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
         sharedPreferences.edit().putInt("fullQnt", fullQnt).apply()
     }
 
+    fun saveProductQnt(fullQnt: Int) {
+        sharedPreferences.edit().putInt("productQnt", fullQnt).apply()
+    }
+    fun getProductQnt(): Int {
+        return sharedPreferences.getInt("productQnt", 0)
+    }
+
     fun getFullQnt(): Int {
         return sharedPreferences.getInt("fullQnt", 0)
     }
@@ -149,6 +156,19 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
 
     fun getSkladId(): String {
         return sharedPreferences.getString("skladId", "85") ?: "85"
+    }
+
+    // Методы для работы с причиной некондиции
+    fun saveReason(reason: String) {
+        sharedPreferences.edit().putString("reason", reason).apply()
+    }
+
+    fun getReason(): String {
+        return sharedPreferences.getString("reason", "") ?: ""
+    }
+
+    fun clearReason() {
+        sharedPreferences.edit().remove("reason").apply()
     }
 
 }

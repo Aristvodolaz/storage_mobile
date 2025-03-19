@@ -18,7 +18,9 @@ class PlaceProductToBufferUseCase @Inject constructor(
         name: String? = null,
         shk: String? = null,
         article: String? = null,
-        skladId: String? = null
+        skladId: String? = null,
+        reason: String? = null,
+        productQnt: Int
     ): Result<BaseResponse> {
         return repository.placeProductToBuffer(
             productId = productId,
@@ -31,7 +33,9 @@ class PlaceProductToBufferUseCase @Inject constructor(
             name = name,
             shk = shk,
             article = article,
-            skladId = skladId
+            skladId = skladId,
+            reason = reason,
+            productQnt = productQnt
         )
     }
 } 

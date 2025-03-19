@@ -50,7 +50,13 @@ class ExpirationDateViewModel @Inject constructor(
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    fun saveExpirationData(startDate: String, days: String, months: String, condition: String) {
+    fun saveExpirationData(
+        startDate: String,
+        days: String,
+        months: String,
+        condition: String,
+        reason: String? = null
+    ) {
         viewModelScope.launch {
             val localDate = calculateEndDate(startDate, days, months)
             Timber.d("Расчитанная дата окончания срока годности (локальный формат): $localDate")
@@ -73,6 +79,13 @@ class ExpirationDateViewModel @Inject constructor(
             
             spHelper.saveSrokGodnosti(validatedIsoDate)
             spHelper.saveCondition(condition)
+            
+            // Сохраняем причину некондиции, если она указана
+            if (condition == "Некондиция" && !reason.isNullOrEmpty()) {
+                spHelper.saveReason(reason)
+            } else {
+                spHelper.saveReason("")
+            }
         }
     }
     

@@ -38,6 +38,10 @@ class PlacementViewModel @Inject constructor(
         val conditionState = if (condition == "Кондиция") "GOOD" else "BAD"
         Log.d("PlacementViewModel", "Состояние товара: $condition -> $conditionState")
         
+        // Получаем причину некондиции из SPHelper, если товар некондиционный
+        val reason = if (condition != "Кондиция") spHelper.getReason() else ""
+        Log.d("PlacementViewModel", "Причина некондиции: $reason")
+        
         // Получаем срок годности из SPHelper
         val expirationDate = spHelper.getSrokGodnosti()
         Log.d("PlacementViewModel", "Срок годности: $expirationDate")
@@ -52,6 +56,7 @@ class PlacementViewModel @Inject constructor(
         val shk = spHelper.getShk()
         val article = spHelper.getArticle()
         val skladId = spHelper.getSkladId()
+        val productQnt = spHelper.getProductQnt()
         
         Log.d("PlacementViewModel", "Дополнительные данные: wrShk=$wrShk, name=$name, shk=$shk, article=$article, skladId=$skladId")
         
@@ -67,7 +72,9 @@ class PlacementViewModel @Inject constructor(
                 name = name,
                 shk = shk,
                 article = article,
-                skladId = skladId
+                skladId = skladId,
+                reason = reason,
+                productQnt = productQnt
             )
             
             result.fold(

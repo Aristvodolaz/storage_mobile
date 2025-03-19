@@ -14,5 +14,6 @@ data class InventoryUiState(
     val selectedItem: InventoryItem? = null,
     val showUpdateDialog: Boolean = false,
     val showDetailsDialog: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val updateSuccess: Boolean = false
 ) 

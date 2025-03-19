@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Error
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +37,8 @@ fun ExpirationDateScreen(
     var months by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
     var condition by remember { mutableStateOf<String?>(null) }
+    var reason by remember { mutableStateOf("") }
+    var showReasonError by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     // Автоматический расчет конечной даты
@@ -254,7 +257,10 @@ fun ExpirationDateScreen(
                         ) {
                             RadioButton(
                                 selected = condition == "Кондиция",
-                                onClick = { condition = "Кондиция" },
+                                onClick = { 
+                                    condition = "Кондиция"
+                                    showReasonError = false
+                                },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = MaterialTheme.colors.primary
                                 ),
@@ -272,7 +278,10 @@ fun ExpirationDateScreen(
                         ) {
                             RadioButton(
                                 selected = condition == "Некондиция",
-                                onClick = { condition = "Некондиция" },
+                                onClick = { 
+                                    condition = "Некондиция"
+                                    showReasonError = reason.isEmpty()
+                                },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = MaterialTheme.colors.primary
                                 ),
@@ -281,6 +290,36 @@ fun ExpirationDateScreen(
                             Text(
                                 "Некондиция",
                                 fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    // Поле для ввода причины некондиции
+                    if (condition == "Некондиция") {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = reason,
+                            onValueChange = { 
+                                reason = it
+                                showReasonError = it.isEmpty()
+                            },
+                            label = { 
+                                Text(
+                                    "Причина некондиции",
+                                    fontSize = 10.sp
+                                ) 
+                            },
+                            isError = showReasonError,
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            singleLine = true
+                        )
+                        if (showReasonError) {
+                            Text(
+                                text = "Укажите причину некондиции",
+                                color = MaterialTheme.colors.error,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                             )
                         }
                     }
@@ -313,11 +352,22 @@ fun ExpirationDateScreen(
                 
                 Button(
                     onClick = {
-                        viewModel.saveExpirationData(startDate, days, months, condition ?: "")
-                        navController.navigate("product_info")
+                        if (condition == "Некондиция" && reason.isEmpty()) {
+                            showReasonError = true
+                        } else {
+                            viewModel.saveExpirationData(
+                                startDate = startDate,
+                                days = days,
+                                months = months,
+                                condition = condition ?: "",
+                                reason = if (condition == "Некондиция") reason else null
+                            )
+                            navController.navigate("product_info")
+                        }
                     },
                     modifier = Modifier.weight(1f),
-                    enabled = startDate.isNotEmpty() && condition != null,
+                    enabled = startDate.isNotEmpty() && condition != null && 
+                            (condition != "Некондиция" || (condition == "Некондиция" && reason.isNotEmpty())),
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Row(

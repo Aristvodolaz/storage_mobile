@@ -1,5 +1,6 @@
 package com.komus.sorage_mobile.data.api
 
+import com.google.gson.annotations.SerializedName
 import com.komus.sorage_mobile.data.request.MoveProductRequest
 import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
@@ -108,4 +109,18 @@ interface StorageApi {
         @Query("id_sklad") skladId: String
     ): ArticleInventoryResponse
 
+    @POST("/api/storage/inventory")
+    suspend fun confirmInventoryItem(
+        @Body request: InventoryRequest
+    ): BaseResponse
+
 }
+
+data class InventoryRequest(
+    @SerializedName("id") val id: String,
+    @SerializedName("quantity") val quantity: Int,
+    @SerializedName("expirationDate") val expirationDate: String,
+    @SerializedName("conditionState") val conditionState: String,
+    @SerializedName("reason") val reason: String,
+    @SerializedName("executor") val executor: String
+)

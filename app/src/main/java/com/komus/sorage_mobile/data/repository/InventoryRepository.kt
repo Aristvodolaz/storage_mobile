@@ -1,10 +1,12 @@
 package com.komus.sorage_mobile.data.repository
 
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.api.InventoryRequest
 import com.komus.sorage_mobile.data.response.ProductData
 import com.komus.sorage_mobile.domain.model.InventoryItem
 import com.komus.sorage_mobile.util.SPHelper
 import javax.inject.Inject
+import android.util.Log
 
 class InventoryRepository @Inject constructor(
     private val api: StorageApi,
@@ -72,8 +74,61 @@ class InventoryRepository @Inject constructor(
      * Подтверждение товара без изменения количества
      */
     suspend fun confirmItem(item: InventoryItem): InventoryItem {
-        // В реальном приложении здесь будет запрос к API
-        // Для прототипа просто возвращаем обновленный объект
+        val userName = spHelper.getUserName()
+        
+        val request = InventoryRequest(
+            id = item.id,
+            quantity = item.actualQuantity,
+            expirationDate = item.expirationDate,
+            conditionState = if (item.condition == "Кондиция") "кондиция" else "некондиция",
+            reason = item.reason ?: "",
+            executor = userName
+        )
+        
+        val response = api.confirmInventoryItem(request)
+        
+        if (!response.success) {
+            throw Exception(response.message ?: "Ошибка при подтверждении товара")
+        }
+        
         return item.copy(isChecked = true)
+    }
+
+    /**
+     * Обновление данных товара
+     */
+    suspend fun updateItem(
+        item: InventoryItem,
+        newQuantity: Int,
+        newExpirationDate: String,
+        newCondition: String,
+        newReason: String?
+    ): InventoryItem {
+        val userName = spHelper.getUserName()
+        
+        Log.d("InventoryRepository", "Обновление товара: id=${item.id}, количество=$newQuantity, срок годности=$newExpirationDate, состояние=$newCondition, причина=$newReason")
+        
+        val request = InventoryRequest(
+            id = item.id,
+            quantity = newQuantity,
+            expirationDate = newExpirationDate,
+            conditionState = if (newCondition == "Кондиция") "кондиция" else "некондиция",
+            reason = newReason ?: "",
+            executor = userName
+        )
+        
+        val response = api.confirmInventoryItem(request)
+        
+        if (!response.success) {
+            throw Exception(response.message ?: "Ошибка при обновлении товара")
+        }
+        
+        return item.copy(
+            actualQuantity = newQuantity,
+            expirationDate = newExpirationDate,
+            condition = newCondition,
+            reason = newReason,
+            isChecked = true
+        )
     }
 } 
