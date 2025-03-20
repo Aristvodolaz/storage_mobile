@@ -6,6 +6,8 @@ import com.komus.sorage_mobile.data.repository.InventoryRepository
 import com.komus.sorage_mobile.domain.model.InventoryItem
 import com.komus.sorage_mobile.domain.model.SearchType
 import com.komus.sorage_mobile.domain.state.InventoryUiState
+import com.komus.sorage_mobile.util.NetworkUtils
+import com.komus.sorage_mobile.util.SyncManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,14 +16,61 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import android.util.Log
+import androidx.work.WorkInfo
+import com.komus.sorage_mobile.util.DateUtils.convertToIsoFormat
 
 @HiltViewModel
 class InventoryViewModel @Inject constructor(
-    private val repository: InventoryRepository
+    private val repository: InventoryRepository,
+    private val syncManager: SyncManager,
+    private val networkUtils: NetworkUtils
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(InventoryUiState())
     val uiState: StateFlow<InventoryUiState> = _uiState.asStateFlow()
+
+    init {
+        setupSyncWork()
+        observeSyncStatus()
+    }
+
+    private fun setupSyncWork() {
+        syncManager.scheduleSyncWork()
+    }
+
+    private fun observeSyncStatus() {
+        syncManager.getWorkInfo().observeForever { workInfoList ->
+            workInfoList?.let { infos ->
+                val isSyncing = infos.any { it.state == WorkInfo.State.RUNNING }
+                _uiState.update { 
+                    it.copy(
+                        isSyncing = isSyncing,
+                        lastSyncTime = if (!isSyncing && infos.any { info -> info.state == WorkInfo.State.SUCCEEDED }) {
+                            System.currentTimeMillis()
+                        } else {
+                            it.lastSyncTime
+                        }
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            repository.hasUnsyncedChanges().collect { hasChanges ->
+                _uiState.update { it.copy(hasUnsyncedChanges = hasChanges) }
+            }
+        }
+    }
+
+    fun requestSync() {
+        if (!networkUtils.isNetworkAvailable()) {
+            _uiState.update { 
+                it.copy(errorMessage = "Нет подключения к сети. Синхронизация будет выполнена автоматически при появлении сети.")
+            }
+            return
+        }
+        syncManager.requestImmediateSync()
+    }
 
     /**
      * Изменение типа поиска
@@ -185,14 +234,24 @@ class InventoryViewModel @Inject constructor(
                 val updatedItem = repository.updateItem(
                     selectedItem,
                     newQuantity,
-                    newExpirationDate,
+                    convertToIsoFormat(newExpirationDate),
                     newCondition,
                     newReason
                 )
                 
                 updateItemInList(updatedItem)
-                _uiState.update { it.copy(updateSuccess = true) }
+                _uiState.update { 
+                    it.copy(
+                        updateSuccess = true,
+                        hasUnsyncedChanges = true
+                    )
+                }
                 hideDialogs()
+
+                // Запрашиваем немедленную синхронизацию при наличии сети
+                if (networkUtils.isNetworkAvailable()) {
+                    syncManager.requestImmediateSync()
+                }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(

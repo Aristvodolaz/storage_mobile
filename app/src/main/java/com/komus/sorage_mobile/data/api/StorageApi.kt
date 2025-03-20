@@ -18,6 +18,7 @@ import com.komus.sorage_mobile.data.response.SearchResponse
 import com.komus.sorage_mobile.data.response.UnitResponse
 import com.komus.sorage_mobile.data.response.UpdateInventoryRequest
 import com.komus.sorage_mobile.data.response.SyncInventoryRequest
+import com.komus.sorage_mobile.data.model.StorageResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -113,6 +114,13 @@ interface StorageApi {
     suspend fun confirmInventoryItem(
         @Body request: InventoryRequest
     ): BaseResponse
+
+    @GET("/api/storage/all")
+    suspend fun getAllStorageItems(
+        @Query("limit") limit: Int = 1000,
+        @Query("offset") offset: Int = 0,
+        @Query("id_sklad") warehouseId: Int = 85
+    ): StorageResponse
 
 }
 

@@ -14,7 +14,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 private const val TAG = "ProductInfoViewModel"
-
 @HiltViewModel
 class ProductInfoViewModel @Inject constructor(
     private val productSearchRepository: ProductSearchRepository
@@ -26,7 +25,7 @@ class ProductInfoViewModel @Inject constructor(
         LOCATION_NAME, // Поиск по названию ячейки
         ARTICLE        // Поиск по артикулу товара
     }
-    
+
     // MVI: Состояние UI
     data class UiState(
         val searchType: SearchType = SearchType.LOCATION_ID,
@@ -37,7 +36,7 @@ class ProductInfoViewModel @Inject constructor(
         val errorMessage: String? = null,
         val isEmpty: Boolean = false
     )
-    
+
     // MVI: События UI
     sealed class UiEvent {
         data class OnSearchTypeChanged(val searchType: SearchType) : UiEvent()
@@ -45,18 +44,18 @@ class ProductInfoViewModel @Inject constructor(
         object OnSearchClicked : UiEvent()
         object OnErrorDismissed : UiEvent()
     }
-    
+
     // MVI: Эффекты
     sealed class UiEffect {
         data class ShowSnackbar(val message: String) : UiEffect()
     }
-    
+
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState
-    
+
     private val _uiEffect = MutableStateFlow<UiEffect?>(null)
     val uiEffect: StateFlow<UiEffect?> = _uiEffect
-    
+
     // Обработка UI событий
     fun handleEvent(event: UiEvent) {
         when (event) {
@@ -65,10 +64,10 @@ class ProductInfoViewModel @Inject constructor(
             }
             is UiEvent.OnSearchQueryChanged -> {
                 _uiState.update { it.copy(searchQuery = event.query) }
-                
+
                 // Если запрос пустой - сбрасываем результаты
                 if (event.query.isEmpty()) {
-                    _uiState.update { 
+                    _uiState.update {
                         it.copy(
                             locationProducts = emptyList(),
                             productInfo = null,
@@ -78,7 +77,7 @@ class ProductInfoViewModel @Inject constructor(
                     }
                     return
                 }
-                
+
                 // Минимальная длина запроса для автоматического поиска
                 if (event.query.length >= 3) {
                     performSearch()
@@ -90,14 +89,14 @@ class ProductInfoViewModel @Inject constructor(
             }
         }
     }
-    
+
     // Выполнение поиска в зависимости от типа
     private fun performSearch() {
         val query = _uiState.value.searchQuery
         if (query.isEmpty()) return
-        
+
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
-        
+
         viewModelScope.launch {
             try {
                 when (_uiState.value.searchType) {
@@ -107,7 +106,7 @@ class ProductInfoViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при поиске: ${e.message}", e)
-                _uiState.update { 
+                _uiState.update {
                     it.copy(
                         isLoading = false,
                         errorMessage = "Ошибка: ${e.message ?: "Неизвестная ошибка"}",
@@ -118,12 +117,12 @@ class ProductInfoViewModel @Inject constructor(
             }
         }
     }
-    
+
     private suspend fun searchByLocationId(locationId: String) {
         val response = productSearchRepository.searchProductsByLocationId(locationId)
-        
+
         if (response.success) {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     locationProducts = response.data,
@@ -132,12 +131,12 @@ class ProductInfoViewModel @Inject constructor(
                     errorMessage = null
                 )
             }
-            
+
             if (response.data.isEmpty()) {
                 _uiEffect.value = UiEffect.ShowSnackbar("По запросу ничего не найдено")
             }
         } else {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     errorMessage = response.message ?: "Ошибка при поиске товаров в ячейке",
@@ -147,12 +146,12 @@ class ProductInfoViewModel @Inject constructor(
             _uiEffect.value = UiEffect.ShowSnackbar(response.message ?: "Ошибка при поиске товаров")
         }
     }
-    
+
     private suspend fun searchByLocationName(locationName: String) {
         val response = productSearchRepository.searchProductsByLocationName(locationName)
-        
+
         if (response.success) {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     locationProducts = response.data,
@@ -161,12 +160,12 @@ class ProductInfoViewModel @Inject constructor(
                     errorMessage = null
                 )
             }
-            
+
             if (response.data.isEmpty()) {
                 _uiEffect.value = UiEffect.ShowSnackbar("По запросу ничего не найдено")
             }
         } else {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     errorMessage = response.message ?: "Ошибка при поиске товаров по названию ячейки",
@@ -176,12 +175,12 @@ class ProductInfoViewModel @Inject constructor(
             _uiEffect.value = UiEffect.ShowSnackbar(response.message ?: "Ошибка при поиске товаров")
         }
     }
-    
+
     private suspend fun searchByArticle(article: String) {
         val response = productSearchRepository.searchProductsByArticle(article)
-        
+
         if (response.success && response.data != null) {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     locationProducts = emptyList(),
@@ -190,12 +189,12 @@ class ProductInfoViewModel @Inject constructor(
                     errorMessage = null
                 )
             }
-            
+
             if (response.data.items.isEmpty()) {
                 _uiEffect.value = UiEffect.ShowSnackbar("По артикулу ничего не найдено")
             }
         } else {
-            _uiState.update { 
+            _uiState.update {
                 it.copy(
                     isLoading = false,
                     errorMessage = response.message ?: "Ошибка при поиске товара по артикулу",
@@ -205,4 +204,4 @@ class ProductInfoViewModel @Inject constructor(
             _uiEffect.value = UiEffect.ShowSnackbar(response.message ?: "Ошибка при поиске товара")
         }
     }
-} 
+}

@@ -44,6 +44,8 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -103,12 +105,56 @@ fun InventoryScreen(
     Scaffold(
         scaffoldState = scaffoldState,
         topBar = {
-            TopAppBar(
-                title = { Text("Инвентаризация", fontSize = 16.sp) },
-                backgroundColor = MaterialTheme.colors.primary,
-                contentColor = Color.White,
-                elevation = 4.dp
-            )
+            Column {
+                TopAppBar(
+                    title = { Text("Инвентаризация", fontSize = 16.sp) },
+                    backgroundColor = MaterialTheme.colors.primary,
+                    contentColor = Color.White,
+                    elevation = 4.dp,
+                    actions = {
+                        if (uiState.isSyncing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .padding(4.dp),
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        } else if (uiState.hasUnsyncedChanges) {
+                            IconButton(onClick = { viewModel.requestSync() }) {
+                                Icon(
+                                    Icons.Default.Sync,
+                                    contentDescription = "Синхронизировать",
+                                    tint = Color.White
+                                )
+                            }
+                        }
+                    }
+                )
+                if (uiState.hasUnsyncedChanges) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFFFFF3E0))
+                            .padding(8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = Color(0xFFF57C00),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Есть несинхронизированные изменения",
+                            fontSize = 12.sp,
+                            color = Color(0xFFF57C00)
+                        )
+                    }
+                }
+            }
         },
         snackbarHost = { hostState ->
             SnackbarHost(hostState) { data ->

@@ -166,7 +166,8 @@ class PickViewModel @Inject constructor(
                     conditionState = conditionState,
                     executor = executor,
                     skladId = skladId,
-                    expirationDate = expirationDate
+                    expirationDate = expirationDate,
+                    productQnt = spHelper.getProductQnt().toString()
                 )
                 
                 if (response.success) {

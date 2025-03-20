@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.komus.sorage_mobile.util.NetworkUtils
 import com.komus.sorage_mobile.util.SPHelper
+import com.komus.sorage_mobile.util.SyncManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,12 +27,11 @@ object AppModule {
     fun provideSPHelper(sharedPreferences: SharedPreferences): SPHelper {
         return SPHelper(sharedPreferences)
     }
+    
 
     @Provides
     @Singleton
-    fun provideNetworkUtils(@ApplicationContext context: Context): NetworkUtils {
-        return NetworkUtils(context)
+    fun provideSyncManager(@ApplicationContext context: Context, networkUtils: NetworkUtils): SyncManager {
+        return SyncManager(context, networkUtils)
     }
-
-
-} 
+}

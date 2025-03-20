@@ -15,5 +15,8 @@ data class InventoryUiState(
     val showUpdateDialog: Boolean = false,
     val showDetailsDialog: Boolean = false,
     val errorMessage: String? = null,
-    val updateSuccess: Boolean = false
+    val updateSuccess: Boolean = false,
+    val isSyncing: Boolean = false,
+    val hasUnsyncedChanges: Boolean = false,
+    val lastSyncTime: Long = 0
 ) 

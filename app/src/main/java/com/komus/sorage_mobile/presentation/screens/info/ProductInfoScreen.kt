@@ -486,7 +486,7 @@ fun CompactProductLocationCard(location: ProductLocation) {
             ) {
                 CompactInfoItem(
                     label = "Ячейка:", 
-                    value = location.locationId ?: "", 
+                    value = location.name_wr ?: "",
                     valueStyle = LocalTextStyle.current.copy(
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp

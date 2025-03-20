@@ -2,10 +2,14 @@ package com.komus.sorage_mobile.presentation.screens.razmechenie
 
 import android.util.Log
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,6 +23,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
@@ -219,76 +224,99 @@ fun SearchScreen(
                             Column(
                                 modifier = Modifier.padding(8.dp)
                             ) {
-                                Text(
-                                    "Найдено товаров: ${results.size}",
-                                    style = MaterialTheme.typography.caption,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF2E7D32)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "Найдено товаров: ${results.size}",
+                                        style = MaterialTheme.typography.caption,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF2E7D32)
+                                    )
+                                    
+                                    Text(
+                                        "Прокрутите для просмотра",
+                                        style = MaterialTheme.typography.caption,
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF2E7D32),
+                                        textAlign = TextAlign.End
+                                    )
+                                }
                                 
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
                                 
-                                Text(
-                                    "Выберите товар из списка:",
-                                    style = MaterialTheme.typography.caption,
-                                    fontSize = 10.sp
-                                )
-                                
-                                Spacer(modifier = Modifier.height(4.dp))
-                                
-                                results.forEach { item ->
-                                    Card(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 2.dp)
-                                            .clickable {
-                                                selectedItem = item
-                                                navigating = true
-                                                saveProductData(spHelper, item)
-                                                navController.navigate("search_results/${selectedItem!!.ID}")
-                                                searchViewModel.resetState()
-                                            },
-                                        elevation = 1.dp,
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(6.dp)
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 400.dp)
+                                ) {
+                                    items(results) { item ->
+                                        Card(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp)
+                                                .clickable {
+                                                    selectedItem = item
+                                                    navigating = true
+                                                    saveProductData(spHelper, item)
+                                                    navController.navigate("search_results/${selectedItem!!.ID}")
+                                                    searchViewModel.resetState()
+                                                },
+                                            elevation = 2.dp,
+                                            backgroundColor = Color.White,
+                                            shape = RoundedCornerShape(8.dp)
                                         ) {
-                                            Text(
-                                                text = item.NAME,
-                                                style = MaterialTheme.typography.caption,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                            
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            
                                             Row(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                horizontalArrangement = Arrangement.SpaceBetween
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(8.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text(
-                                                    text = "Арт: ${item.ARTICLE_ID_REAL}",
-                                                    style = MaterialTheme.typography.caption,
-                                                    fontSize = 8.sp,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
+                                                Column(
                                                     modifier = Modifier.weight(1f)
-                                                )
-                                                
-                                                if (item.SHK.isNotEmpty()) {
+                                                ) {
                                                     Text(
-                                                        text = "ШК: ${item.SHK}",
-                                                        style = MaterialTheme.typography.caption,
-                                                        fontSize = 8.sp,
-                                                        maxLines = 1,
-                                                        overflow = TextOverflow.Ellipsis,
-                                                        modifier = Modifier.weight(1f)
+                                                        text = item.NAME ?: "Нет названия",
+                                                        fontSize = 12.sp,
+                                                        fontWeight = FontWeight.Bold,
+                                                        maxLines = 2,
+                                                        overflow = TextOverflow.Ellipsis
                                                     )
+                                                    
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = "Артикул: ${item.ARTICLE_ID_REAL}",
+                                                            fontSize = 10.sp,
+                                                            color = Color.Gray
+                                                        )
+                                                        
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        
+                                                        if (!item.SHK.isNullOrEmpty()) {
+                                                            Text(
+                                                                text = "ШК: ${item.SHK}",
+                                                                fontSize = 10.sp,
+                                                                color = Color.Gray
+                                                            )
+                                                        }
+                                                    }
+
                                                 }
+                                                
+                                                Icon(
+                                                    imageVector = Icons.Default.ArrowForward,
+                                                    contentDescription = "Выбрать",
+                                                    tint = MaterialTheme.colors.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
                                             }
                                         }
                                     }
@@ -354,29 +382,6 @@ fun SearchScreen(
                 else -> {}
             }
         }
-    }
-}
-
-@Composable
-fun ScanButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MaterialTheme.colors.primary)
-            .border(1.dp, MaterialTheme.colors.primary, RoundedCornerShape(4.dp))
-            .clickable(onClick = onClick)
-            .padding(4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            painter = painterResource(id = android.R.drawable.ic_menu_camera),
-            contentDescription = "Сканировать",
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-        )
     }
 }
 
