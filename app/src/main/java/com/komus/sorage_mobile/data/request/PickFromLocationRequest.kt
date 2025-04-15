@@ -6,5 +6,6 @@ data class PickFromLocationRequest(
     val prunitId: String,
     val quantity: Int,
     val executor: String,
-    val sklad_id: String
+    val sklad_id: String,
+    val productQnt: Int
 ) 

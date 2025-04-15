@@ -28,6 +28,12 @@ class OfflinePlacementRepository @Inject constructor(
 
     suspend fun savePlacement(placement: OfflinePlacementEntity) {
         try {
+            // Проверка валидности срока годности
+            val isExpired = isExpirationDateExpired(placement.endDate)
+            if (isExpired && placement.condition == "Кондиция") {
+                throw IllegalArgumentException("Нельзя выбрать состояние 'Кондиция' для товара с истекшим сроком годности")
+            }
+            
             offlinePlacementDao.insertPlacement(placement)
             Log.d("OfflinePlacementRepo", "Placement saved successfully: ${placement.id}")
             
@@ -40,48 +46,74 @@ class OfflinePlacementRepository @Inject constructor(
             throw e
         }
     }
-    private suspend fun syncPlacement(placement: OfflinePlacementEntity) {
+
+    // Метод для проверки, истек ли срок годности
+    private fun isExpirationDateExpired(expirationDate: String): Boolean {
         try {
-            // Попытка отправить размещение на сервер
-            // Адаптируйте под реальное API
-            val response = storageApi.placeProductToBuffer(
-                placement.article,
-                PlaceProductRequest(
-                    wrShk = placement.cellBarcode,
-                    article = placement.article,
-                    productQnt = placement.productQnt,
-                    quantity = placement.quantity,
-                    shk = placement.barcode,
-                    reason = placement.reason,
-                    conditionState = placement.condition,
-                    prunitId = placement.prunitTypeId.toString(),
-                    expirationDate = placement.endDate,
-                    executor = spHelper.getUserName(),
-                    skladId = spHelper.getSkladId()
-            )
-            )
-
-            val isSuccess = response != null
-
-            if (isSuccess) {
-                offlinePlacementDao.markAsSynced(placement.id)
-                Log.d("OfflinePlacementRepo", "Placement synced successfully: ${placement.id}")
-            } else {
-                offlinePlacementDao.updateSyncAttempt(
-                    placementId = placement.id,
-                    timestamp = System.currentTimeMillis(),
-                    error = "Ошибка синхронизации"
-                )
-                Log.e("OfflinePlacementRepo", "Sync failed")
-            }
+            val formatter = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            val expDate = formatter.parse(expirationDate)
+            val currentDate = java.util.Date()
+            return expDate?.before(currentDate) ?: false
         } catch (e: Exception) {
-            offlinePlacementDao.updateSyncAttempt(
-                placementId = placement.id,
-                timestamp = System.currentTimeMillis(),
-                error = e.message
-            )
-            Log.e("OfflinePlacementRepo", "Error syncing placement", e)
+            Log.e("OfflinePlacementRepo", "Error parsing expiration date", e)
+            return false
         }
+    }
+
+    private suspend fun syncPlacement(placement: OfflinePlacementEntity) {
+        val maxRetries = 3
+        var retryCount = 0
+        var lastException: Exception? = null
+        
+        while (retryCount < maxRetries) {
+            try {
+                Log.d("OfflinePlacementRepo", "Attempt ${retryCount + 1} to sync placement ${placement.id}")
+                
+                // Попытка отправить размещение на сервер
+                val response = storageApi.placeProductToBuffer(
+                    placement.article,
+                    PlaceProductRequest(
+                        wrShk = placement.cellBarcode,
+                        article = placement.article,
+                        productQnt = placement.productQnt,
+                        quantity = placement.quantity,
+                        shk = placement.barcode,
+                        reason = placement.reason,
+                        conditionState = placement.condition,
+                        prunitId = placement.prunitTypeId.toString(),
+                        expirationDate = placement.endDate,
+                        executor = spHelper.getUserName(),
+                        skladId = spHelper.getSkladId()
+                    )
+                )
+
+                val isSuccess = response.success
+                
+                if (isSuccess) {
+                    offlinePlacementDao.markAsSynced(placement.id)
+                    Log.d("OfflinePlacementRepo", "Placement synced successfully: ${placement.id}")
+                    return
+                } else {
+                    val errorMessage = response.message ?: "Неизвестная ошибка"
+                    Log.e("OfflinePlacementRepo", "Sync failed: $errorMessage")
+                    lastException = Exception(errorMessage)
+                    retryCount++
+                    kotlinx.coroutines.delay(1000L * retryCount) // Увеличивающаяся задержка между попытками
+                }
+            } catch (e: Exception) {
+                Log.e("OfflinePlacementRepo", "Error syncing placement", e)
+                lastException = e
+                retryCount++
+                kotlinx.coroutines.delay(1000L * retryCount) // Увеличивающаяся задержка между попытками
+            }
+        }
+        
+        // После всех попыток сохраняем информацию об ошибке
+        offlinePlacementDao.updateSyncAttempt(
+            placementId = placement.id,
+            timestamp = System.currentTimeMillis(),
+            error = lastException?.message ?: "Неизвестная ошибка после $maxRetries попыток"
+        )
     }
 
     suspend fun syncPendingPlacements() {
@@ -118,5 +150,111 @@ class OfflinePlacementRepository @Inject constructor(
 
     suspend fun getPlacementById(id: String): OfflinePlacementEntity? {
         return offlinePlacementDao.getPlacementById(id)
+    }
+
+    // Метод для перемещения товара
+    suspend fun movePlacement(fromCell: String, toCell: String, placement: OfflinePlacementEntity): Result<Boolean> {
+        return try {
+            if (!networkUtils.isNetworkAvailable()) {
+                Log.d("OfflinePlacementRepo", "No network connection available for move operation")
+                // Сохраняем перемещение локально
+                val moveOperation = placement.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    cellBarcode = toCell
+                )
+                offlinePlacementDao.insertPlacement(moveOperation)
+                Result.success(true)
+            } else {
+                try {
+                    // Попытка выполнить перемещение онлайн
+                    val response = storageApi.moveProductToBuffer(
+                        placement.article,
+                        PlaceProductRequest(
+                            wrShk = toCell,
+                            article = placement.article,
+                            productQnt = placement.productQnt,
+                            quantity = placement.quantity,
+                            shk = placement.barcode,
+                            reason = placement.reason,
+                            conditionState = placement.condition,
+                            prunitId = placement.prunitTypeId.toString(),
+                            expirationDate = placement.endDate,
+                            executor = spHelper.getUserName(),
+                            skladId = spHelper.getSkladId()
+                        )
+                    )
+                    
+                    if (response.success) {
+                        Result.success(true)
+                    } else {
+                        Result.failure(Exception(response.message ?: "Ошибка при перемещении товара"))
+                    }
+                } catch (e: Exception) {
+                    // При ошибке сохраняем локально
+                    val moveOperation = placement.copy(
+                        id = java.util.UUID.randomUUID().toString(),
+                        cellBarcode = toCell
+                    )
+                    offlinePlacementDao.insertPlacement(moveOperation)
+                    Result.failure(e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("OfflinePlacementRepo", "Error during move operation", e)
+            Result.failure(e)
+        }
+    }
+
+    // Метод для снятия товара
+    suspend fun removePlacement(placement: OfflinePlacementEntity): Result<Boolean> {
+        return try {
+            if (!networkUtils.isNetworkAvailable()) {
+                Log.d("OfflinePlacementRepo", "No network connection available for remove operation")
+                // Сохраняем операцию снятия локально
+                val removeOperation = placement.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    reason = "Снятие товара"
+                )
+                offlinePlacementDao.insertPlacement(removeOperation)
+                Result.success(true)
+            } else {
+                try {
+                    // Попытка выполнить снятие онлайн
+                    val response = storageApi.removeProductFromBuffer(
+                        placement.article,
+                        PlaceProductRequest(
+                            wrShk = placement.cellBarcode,
+                            article = placement.article,
+                            productQnt = placement.productQnt,
+                            quantity = placement.quantity,
+                            shk = placement.barcode,
+                            reason = "Снятие товара",
+                            conditionState = placement.condition,
+                            prunitId = placement.prunitTypeId.toString(),
+                            expirationDate = placement.endDate,
+                            executor = spHelper.getUserName(),
+                            skladId = spHelper.getSkladId()
+                        )
+                    )
+                    
+                    if (response.success) {
+                        Result.success(true)
+                    } else {
+                        Result.failure(Exception(response.message ?: "Ошибка при снятии товара"))
+                    }
+                } catch (e: Exception) {
+                    // При ошибке сохраняем локально
+                    val removeOperation = placement.copy(
+                        id = java.util.UUID.randomUUID().toString(),
+                        reason = "Снятие товара"
+                    )
+                    offlinePlacementDao.insertPlacement(removeOperation)
+                    Result.failure(e)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("OfflinePlacementRepo", "Error during remove operation", e)
+            Result.failure(e)
+        }
     }
 } 

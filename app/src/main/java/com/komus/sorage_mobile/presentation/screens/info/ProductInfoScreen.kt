@@ -147,6 +147,7 @@ fun ProductInfoScreen(
                                     ProductInfoViewModel.SearchType.LOCATION_ID -> "ШК"
                                     ProductInfoViewModel.SearchType.LOCATION_NAME -> "Название"
                                     ProductInfoViewModel.SearchType.ARTICLE -> "Артикул"
+                                    ProductInfoViewModel.SearchType.EMPTY_CELLS -> "Ячейки"
                                 },
                                 maxLines = 1,
                                 fontSize = 12.sp,
@@ -189,6 +190,7 @@ fun ProductInfoScreen(
                                         ProductInfoViewModel.SearchType.LOCATION_ID -> "Штрих-код"
                                         ProductInfoViewModel.SearchType.LOCATION_NAME -> "Название"
                                         ProductInfoViewModel.SearchType.ARTICLE -> "Артикул"
+                                        ProductInfoViewModel.SearchType.EMPTY_CELLS -> "Ячейки"
                                     },
                                     fontSize = 12.sp
                                 )
@@ -365,7 +367,28 @@ fun ProductInfoScreen(
                             Spacer(modifier = Modifier.height(16.dp))
                         }
                     }
+                }else if (uiState.searchType == ProductInfoViewModel.SearchType.EMPTY_CELLS && uiState.emptyCells.isNotEmpty()) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(uiState.emptyCells) { cellName ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                elevation = 2.dp,
+                                shape = RoundedCornerShape(6.dp)
+                            ) {
+                                Text(
+                                    text = cellName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
                 }
+
             }
         }
     }

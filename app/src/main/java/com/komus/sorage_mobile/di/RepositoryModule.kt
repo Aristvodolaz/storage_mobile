@@ -1,5 +1,6 @@
 package com.komus.sorage_mobile.di
 
+import com.komus.sorage_mobile.data.api.AuthApi
 import com.komus.sorage_mobile.data.api.StorageApi
 import com.komus.sorage_mobile.data.db.AppDatabase
 import com.komus.sorage_mobile.data.db.dao.InventoryDao
@@ -28,7 +29,7 @@ object RepositoryModule {
 
     @Provides
     @Singleton
-    fun provideAuthRepository(apiService: StorageApi): AuthRepository {
+    fun provideAuthRepository(apiService: AuthApi): AuthRepository {
         return AuthRepository(apiService)
     }
 

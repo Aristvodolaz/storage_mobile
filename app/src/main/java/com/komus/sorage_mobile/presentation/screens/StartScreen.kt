@@ -159,7 +159,7 @@ fun NavigationGraph(
 
 
             composable("auth") {
-                AuthScreen(navController = navController) // Display AuthScreen first
+                AuthScreen(navController = navController, scannerViewModel) // Display AuthScreen first
             }
             composable(Screen.Inventory.route) {
                 InventoryScreen(scannerViewModel = scannerViewModel)

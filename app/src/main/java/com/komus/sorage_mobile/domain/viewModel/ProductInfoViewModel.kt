@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.komus.sorage_mobile.data.repository.ProductSearchRepository
 import com.komus.sorage_mobile.data.response.LocationProduct
 import com.komus.sorage_mobile.data.response.ProductInfo
+import com.komus.sorage_mobile.util.SPHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,23 +17,26 @@ import javax.inject.Inject
 private const val TAG = "ProductInfoViewModel"
 @HiltViewModel
 class ProductInfoViewModel @Inject constructor(
-    private val productSearchRepository: ProductSearchRepository
+    private val productSearchRepository: ProductSearchRepository,
+    private val  spHelper: SPHelper
 ) : ViewModel() {
 
     // Типы поиска, которые пользователь может выбрать
     enum class SearchType {
-        LOCATION_ID,   // Поиск по штрих-коду ячейки
-        LOCATION_NAME, // Поиск по названию ячейки
-        ARTICLE        // Поиск по артикулу товара
+        LOCATION_ID,
+        LOCATION_NAME,
+        ARTICLE,
+        EMPTY_CELLS  // Новый тип поиска
     }
 
-    // MVI: Состояние UI
+
     data class UiState(
         val searchType: SearchType = SearchType.LOCATION_ID,
         val searchQuery: String = "",
         val isLoading: Boolean = false,
         val locationProducts: List<LocationProduct> = emptyList(),
         val productInfo: ProductInfo? = null,
+        val emptyCells: List<String> = emptyList(),  // Новое поле
         val errorMessage: String? = null,
         val isEmpty: Boolean = false
     )
@@ -89,11 +93,8 @@ class ProductInfoViewModel @Inject constructor(
             }
         }
     }
-
-    // Выполнение поиска в зависимости от типа
     private fun performSearch() {
         val query = _uiState.value.searchQuery
-        if (query.isEmpty()) return
 
         _uiState.update { it.copy(isLoading = true, errorMessage = null) }
 
@@ -103,6 +104,7 @@ class ProductInfoViewModel @Inject constructor(
                     SearchType.LOCATION_ID -> searchByLocationId(query)
                     SearchType.LOCATION_NAME -> searchByLocationName(query)
                     SearchType.ARTICLE -> searchByArticle(query)
+                    SearchType.EMPTY_CELLS -> searchEmptyCells() // добавлено
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при поиске: ${e.message}", e)
@@ -113,10 +115,26 @@ class ProductInfoViewModel @Inject constructor(
                         isEmpty = false
                     )
                 }
-                _uiEffect.value = UiEffect.ShowSnackbar("Ошибка при поиске товаров")
+                _uiEffect.value = UiEffect.ShowSnackbar("Ошибка при получении данных")
             }
         }
     }
+
+    private suspend fun searchEmptyCells() {
+        val skladId = spHelper.getSkladId().toInt()
+        val emptyCells = productSearchRepository.getEmptyCells(skladId)
+
+        _uiState.update {
+            it.copy(
+                isLoading = false,
+                emptyCells = emptyCells,
+                isEmpty = emptyCells.isEmpty(),
+                errorMessage = if (emptyCells.isEmpty()) "Пустых ячеек нет" else null
+            )
+        }
+    }
+
+
 
     private suspend fun searchByLocationId(locationId: String) {
         val response = productSearchRepository.searchProductsByLocationId(locationId)

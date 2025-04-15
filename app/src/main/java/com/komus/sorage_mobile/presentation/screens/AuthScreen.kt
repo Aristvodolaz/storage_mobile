@@ -38,7 +38,7 @@ import com.komus.sorage_mobile.util.Screen
 @Composable
 fun AuthScreen(
     navController: NavController,
-    scannerViewModel: ScannerViewModel = hiltViewModel(),
+    scannerViewModel: ScannerViewModel,
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current

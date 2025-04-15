@@ -38,7 +38,10 @@ interface InventoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertStorageItems(items: List<StorageItemEntity>)
 
-    @Query("SELECT * FROM storage_items WHERE article = :article OR shk = :barcode")
+    @Query("SELECT * FROM storage_items WHERE article LIKE :query OR shk LIKE :query")
+    suspend fun searchStorageItems(query: String): List<StorageItemEntity>
+
+    @Query("SELECT * FROM storage_items WHERE article = :article OR shk = :barcode LIMIT 1")
     suspend fun findStorageItemByArticleOrBarcode(article: String, barcode: String): StorageItemEntity?
 
     @Query("SELECT * FROM storage_items WHERE idScklad = :warehouseId")

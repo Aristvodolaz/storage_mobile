@@ -41,6 +41,9 @@ class InventoryRepository @Inject constructor(
                 }
 
                 val items = response.data.map { product ->
+                    val actualQuantity = product.units[0].quantity.toInt()
+                    Log.d(TAG, "Получены данные с сервера: артикул=${product.article}, кол-во=${actualQuantity}")
+                    
                     InventoryItem(
                         id = product.id.toString(),
                         name = product.name,
@@ -48,8 +51,8 @@ class InventoryRepository @Inject constructor(
                         barcode = product.shk,
                         locationId = product.idSklad.toString(),
                         locationName = "",
-                        expectedQuantity = product.units[0].quantity.toInt(),
-                        actualQuantity = product.units[0].quantity.toInt(),
+                        expectedQuantity = actualQuantity,
+                        actualQuantity = actualQuantity,
                         isChecked = false,
                         expirationDate = product.units[0].expirationDate ?: "",
                         condition = if (product.units[0].conditionState == "GOOD") "Кондиция" else "Некондиция",
@@ -67,13 +70,21 @@ class InventoryRepository @Inject constructor(
 
                 items
             } catch (e: Exception) {
-                Log.e("InventoryRepository", "Ошибка при получении данных с сервера: ${e.message}")
+                Log.e(TAG, "Ошибка при получении данных с сервера: ${e.message}")
                 // В случае ошибки, возвращаем данные из локальной базы
-                dao.getItemsByLocationId(locationId).first().map { it.toInventoryItem() }
+                dao.getItemsByLocationId(locationId).first().map { 
+                    val item = it.toInventoryItem()
+                    Log.d(TAG, "Получены данные из БД: артикул=${item.article}, кол-во=${item.actualQuantity}")
+                    item 
+                }
             }
         } else {
             // Если нет сети, возвращаем данные из локальной базы
-            dao.getItemsByLocationId(locationId).first().map { it.toInventoryItem() }
+            dao.getItemsByLocationId(locationId).first().map { 
+                val item = it.toInventoryItem()
+                Log.d(TAG, "Нет сети. Получены данные из БД: артикул=${item.article}, кол-во=${item.actualQuantity}")
+                item 
+            }
         }
     }
 
@@ -146,7 +157,7 @@ class InventoryRepository @Inject constructor(
                 val request = InventoryRequest(
                     id = item.id,
                     quantity = item.actualQuantity,
-                    expirationDate = item.expirationDate,
+                    expirationDate = convertToIsoFormat(item.expirationDate),
                     conditionState = if (item.condition == "Кондиция") "кондиция" else "некондиция",
                     reason = item.reason ?: "",
                     executor = userName

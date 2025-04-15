@@ -71,7 +71,8 @@ class PickRepository @Inject constructor(
         prunitId: String,
         quantity: Int,
         executor: String,
-        skladId: String
+        skladId: String,
+        productQnt: Int
     ): BaseResponse {
         Log.d("PickRepository", "Снятие товара из ячейки: productId=$productId, wrShk=$wrShk, quantity=$quantity")
         
@@ -81,7 +82,8 @@ class PickRepository @Inject constructor(
             prunitId = prunitId,
             quantity = quantity,
             executor = executor,
-            sklad_id = skladId
+            sklad_id = skladId,
+            productQnt = productQnt
         )
         
         return try {
@@ -100,7 +102,8 @@ class PickRepository @Inject constructor(
         prunitId: String,
         quantity: Int,
         executor: String,
-        skladId: String
+        skladId: String,
+        productQnt: Int
     ): BaseResponse {
         Log.d("PickRepository", "Снятие товара из ячейки с учетом склада: productId=$productId, wrShk=$wrShk, skladId=$skladId, quantity=$quantity")
         
@@ -110,7 +113,8 @@ class PickRepository @Inject constructor(
             prunitId = prunitId,
             quantity = quantity,
             executor = executor,
-            sklad_id = skladId
+            sklad_id = skladId,
+            productQnt = productQnt
         )
         
         return try {
@@ -133,7 +137,8 @@ class PickRepository @Inject constructor(
         executor: String,
         skladId: String,
         expirationDate: String,
-        productQnt:String
+        productQnt:String,
+        reason: String
     ): BaseResponse {
         // Обрабатываем дату через ProductMovementHelper для обеспечения ISO формата
         val isoExpirationDate = ProductMovementHelper.processExpirationDate(expirationDate)
@@ -150,7 +155,8 @@ class PickRepository @Inject constructor(
             expirationDate = isoExpirationDate,
             productId = productId,
             targetShk = targetLocationId,
-            productQnt = productQnt
+            productQnt = productQnt,
+            reason = reason
         )
         
         return try {

@@ -161,9 +161,20 @@ fun ScanLocationScreen(
                     } else {
                         selectedItem!!.units[0].quantity?.toString() ?: "Н/Д"
                     }
-                    
+
+                    val productQnt = selectedItem?.units?.getOrNull(0)?.productQnt?.toDouble() ?: 1.0
+                    val justCoun = availableQuantity.toDouble() / productQnt
+
+
                     Text(
-                        text = "Доступное количество: $availableQuantity",
+                        text = "Доступное количество: $justCoun",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colors.primary,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "Количество в еденицах: $availableQuantity",
                         style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,

@@ -58,16 +58,26 @@ class ProductSearchRepository @Inject constructor(
         }
     }
 
+    suspend fun getEmptyCells(skladId: Int): List<String> {
+        return if (networkUtils.isNetworkAvailable()) {
+            val response = api.getEmptyCells(skladId)
+            if (response.success) {
+                response.data.cells.map { it.name }
+            } else {
+                emptyList()
+            }
+        } else {
+            emptyList()
+        }
+    }
 
     private suspend fun searchProductsFromDatabase(query: String): List<ProductInfo> {
-        // If query is a barcode (i.e., length > 7), search by Shk, else by article
         val storageItems = if (query.length > 7) {
             dao.findItemsByShk(query)
         } else {
             dao.findItemsByArticle(query)
         }
 
-        // Map the list of StorageItemEntity to ProductInfo and return
         return storageItems.map { storageItemEntity ->
             ProductInfo(
                 id = storageItemEntity.id,

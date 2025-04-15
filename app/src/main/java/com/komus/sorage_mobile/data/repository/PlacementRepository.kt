@@ -22,17 +22,17 @@ class PlacementRepository @Inject constructor(
         conditionState: String,
         expirationDate: String,
         executor: String,
-        wrShk: String? = null,
-        name: String? = null,
-        shk: String? = null,
-        article: String? = null,
-        skladId: String? = null,
-        reason: String? = null,
+        wrShk: String? = "",
+        name: String? = "",
+        shk: String? = "",
+        article: String? = "",
+        skladId: String? = "",
+        reason: String? = "",
         productQnt: Int
     ): Result<BaseResponse> {
         return try {
-            Log.d(TAG, "Размещение товара $productId в буфер")
-            
+            Log.d(TAG, "Отправка запроса на размещение в буфер: productId=$productId, wrShk=$wrShk, skladId=$skladId, reason=$reason")
+
             val request = PlaceProductRequest(
                 prunitId = prunitId,
                 quantity = quantity,
@@ -47,13 +47,13 @@ class PlacementRepository @Inject constructor(
                 reason = reason,
                 productQnt = productQnt
             )
-            
+
             val response = withContext(Dispatchers.IO) {
                 api.placeProductToBuffer(productId, request)
             }
-            
+
             if (response.success) {
-                Log.d(TAG, "Товар успешно размещен в буфер")
+                Log.d(TAG, "Товар успешно размещен в буфер: ${response.message}")
                 Result.success(response)
             } else {
                 Log.e(TAG, "Ошибка размещения товара: ${response.message}")
@@ -64,6 +64,7 @@ class PlacementRepository @Inject constructor(
             Result.failure(e)
         }
     }
+
 
     suspend fun syncPlacements() {
         try {

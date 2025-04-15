@@ -19,6 +19,7 @@ import com.komus.sorage_mobile.data.response.UnitResponse
 import com.komus.sorage_mobile.data.response.UpdateInventoryRequest
 import com.komus.sorage_mobile.data.response.SyncInventoryRequest
 import com.komus.sorage_mobile.data.model.StorageResponse
+import com.komus.sorage_mobile.data.response.EmptyCellsResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -121,6 +122,11 @@ interface StorageApi {
         @Query("offset") offset: Int = 0,
         @Query("id_sklad") warehouseId: Int = 85
     ): StorageResponse
+
+    @GET("/api/storage/empty-cells")
+    suspend fun getEmptyCells(
+        @Query("id_sklad") skladId: Int
+    ): EmptyCellsResponse
 
 }
 
