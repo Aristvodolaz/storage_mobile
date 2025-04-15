@@ -13,5 +13,7 @@ data class MoveProductRequest(
     @SerializedName("executor") val executor: String,
     @SerializedName("id_sklad") val skladId: String,
     @SerializedName("productId") val productId: String,
-    @SerializedName("productQnt") val productQnt: String
-    )
+    @SerializedName("productQnt") val productQnt: String,
+    @SerializedName("reason") val reason: String
+
+)

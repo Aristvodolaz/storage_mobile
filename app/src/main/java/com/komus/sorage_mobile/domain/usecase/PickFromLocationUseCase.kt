@@ -13,7 +13,8 @@ class PickFromLocationUseCase @Inject constructor(
         prunitId: String,
         quantity: Int,
         executor: String,
-        skladId: String
+        skladId: String,
+        productQnt: Int
     ): BaseResponse {
         return pickRepository.pickFromLocation(
             productId = productId,
@@ -21,7 +22,8 @@ class PickFromLocationUseCase @Inject constructor(
             prunitId = prunitId,
             quantity = quantity,
             executor = executor,
-            skladId = skladId
+            skladId = skladId,
+            productQnt
         )
     }
 } 

@@ -1,5 +1,6 @@
 package com.komus.sorage_mobile.presentation.screens.razmechenie
 
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.domain.state.PlacementState
+import com.komus.sorage_mobile.domain.util.ExpirationDateValidator
 import com.komus.sorage_mobile.domain.viewModel.PlacementViewModel
 import com.komus.sorage_mobile.util.Screen
 
@@ -238,25 +240,6 @@ fun ProductInfoScreen(
         
         Button(
             onClick = {
-                navController.navigate("scan_ir_location")
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = MaterialTheme.colors.primary
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.LocationOn,
-                contentDescription = "Сканировать ячейку",
-                modifier = Modifier.padding(end = 8.dp)
-            )
-            Text("Сканировать ячейку размещения")
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        Button(
-            onClick = {
                 // Переходим на экран сканирования ячейки для буфера
                 navController.navigate("scan_buffer_location")
             },
@@ -285,26 +268,30 @@ fun ScanLocationScreen(
     var locationId by remember { mutableStateOf("") }
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     var showSuccessDialog by remember { mutableStateOf(false) }
-    
-    // Автозаполнение при сканировании
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
     LaunchedEffect(barcodeData) {
         if (barcodeData.isNotEmpty()) {
             locationId = barcodeData
             scannerViewModel.clearBarcode()
-            
-            // Сохраняем ячейку размещения
-            spHelper.saveStorageLocation(locationId)
-            
-            // Показываем диалог успешного размещения
-            showSuccessDialog = true
-            
-            // Небольшая задержка для отображения диалога
-            kotlinx.coroutines.delay(2000)
-            
-            // Возвращаемся на главный экран
-            navController.popBackStack("product_info", inclusive = true)
-            navController.navigate(Screen.Placement.route)
         }
+    }
+
+    // Диалог ошибки
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { showErrorDialog = false },
+            title = { Text("Ошибка") },
+            text = { Text(errorMessage) },
+            confirmButton = {
+                Button(onClick = { showErrorDialog = false }) {
+                    Text("OK")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
+        )
     }
     
     // Диалог успешного размещения
@@ -338,7 +325,7 @@ fun ScanLocationScreen(
             contentColor = MaterialTheme.colors.onSurface
         )
     }
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -379,13 +366,24 @@ fun ScanLocationScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary
                     )
-        Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
                 
-        Button(
-            onClick = {
-                        // Возвращаемся назад, если пользователь хочет отменить
-                navController.popBackStack()
+                Button(
+                    onClick = {
+                        // Проверяем срок годности перед размещением
+                        val expirationDate = spHelper.getSrokGodnosti()
+                        val condition = spHelper.getCondition()
+                        
+                        if (ExpirationDateValidator.isExpired(expirationDate) && condition == "Кондиция") {
+                            errorMessage = "Невозможно разместить товар с истекшим сроком годности в состоянии 'Кондиция'"
+                            showErrorDialog = true
+                            return@Button
+                        }
+                        
+                        navController.navigate("product_info") {
+                            popUpTo("scan_ir_location") { inclusive = true }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(
@@ -442,27 +440,35 @@ fun ScanBufferLocationScreen(
             }
         }
     }
-    
-    // Автозаполнение при сканировании
+
     LaunchedEffect(barcodeData) {
         if (barcodeData.isNotEmpty()) {
             locationId = barcodeData
             scannerViewModel.clearBarcode()
+
+            Log.d("ScanBufferLocationScreen", "Получен штрих-код: $locationId")
+
+            // Проверяем срок годности перед размещением
+            val expirationDate = spHelper.getSrokGodnosti()
+            val condition = spHelper.getCondition()
             
+            if (ExpirationDateValidator.isExpired(expirationDate) && condition == "Кондиция") {
+                errorMessage = "Невозможно разместить товар с истекшим сроком годности в состоянии 'Кондиция'"
+                showErrorDialog = true
+                return@LaunchedEffect
+            }
+
             // Сохраняем ячейку буфера
             spHelper.saveBufferLocation(locationId)
-            
-            // Сохраняем wrShk (код ячейки буфера)
             spHelper.saveWrShk(locationId)
-            
-            // Сохраняем sklad_id (по умолчанию 85, как в примере)
             spHelper.saveSkladId("85")
-            
-            // Отправляем запрос на размещение товара в буфер
+
             val productId = spHelper.getProductId()
             val brief = spHelper.getBrief()
             val fullQnt = spHelper.getFullQnt()
-            
+
+            Log.d("ScanBufferLocationScreen", "Отправка запроса на размещение: productId=$productId, prunitId=$brief, quantity=$fullQnt")
+
             placementViewModel.placeProductToBuffer(
                 productId = productId,
                 prunitId = brief,
@@ -470,7 +476,7 @@ fun ScanBufferLocationScreen(
             )
         }
     }
-    
+
     // Диалог успешного размещения
     if (showSuccessDialog) {
         AlertDialog(
@@ -536,7 +542,7 @@ fun ScanBufferLocationScreen(
             contentColor = MaterialTheme.colors.onSurface
         )
     }
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -589,24 +595,6 @@ fun ScanBufferLocationScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                 }
                 
-                Button(
-                    onClick = {
-                        // Возвращаемся назад, если пользователь хочет отменить
-                        navController.popBackStack()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.primary
-                    ),
-                    enabled = !isLoading
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Сканировать",
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-            Text("Сканировать")
-                }
             }
         }
     }

@@ -23,7 +23,6 @@ import com.komus.sorage_mobile.presentation.screens.razmechenie.UnitSelectionScr
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ExpirationDateScreen
 import com.komus.sorage_mobile.util.SPHelper
 import com.komus.sorage_mobile.util.Screen
-import com.komus.sorage_mobile.presentation.screens.search.ProductSearchScreen
 import com.komus.sorage_mobile.presentation.screens.snyatie.ScanLocationScreen as SnyatieScanLocationScreen
 import com.komus.sorage_mobile.presentation.screens.movement.ScanSourceLocationScreen
 import com.komus.sorage_mobile.presentation.screens.info.ProductInfoScreen
@@ -36,26 +35,31 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import android.os.Build
+import androidx.annotation.RequiresApi
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.components.TopConnectionStatusBar
+import com.komus.sorage_mobile.presentation.screens.razmechenie.OfflinePlacementScreen
+import com.komus.sorage_mobile.presentation.screens.razmechenie.PlacementRouterScreen
+import com.komus.sorage_mobile.ui.navigation.NavRoutes
+import com.komus.sorage_mobile.util.NetworkUtils
+import kotlinx.coroutines.flow.collectLatest
 
 object Routes {
-    const val AUTH = "auth"
-    const val MAIN = "inventory"
-    const val PLACEMENT = "placement"
-    const val PLACEMENT_SCAN_LOCATION = "placement_scan_location"
-    const val PLACEMENT_SCAN_PRODUCT = "placement_scan_product"
-    const val PLACEMENT_EXPIRATION_DATE = "placement_expiration_date"
-    const val SNYATIE_SCAN_LOCATION = "snyatie_scan_location"
     const val MOVE_PRODUCT = "move_product"
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(spHelper: SPHelper,
-               scannerViewModel: ScannerViewModel ) {
+               scannerViewModel: ScannerViewModel,
+               networkUtils: NetworkUtils = hiltViewModel() ) {
     val navController = rememberNavController()
-    
+    val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+    val showBottomBar = currentRoute !in listOf("auth")
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -74,13 +78,16 @@ fun MainScreen(spHelper: SPHelper,
                 Box(
                     modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
                 ) {
-                    BottomNavigationBar(navController)
+                    if (showBottomBar) {
+                        BottomNavigationBar(navController)
+                    }
+
                 }
             },
             // Отключаем встроенные отступы Scaffold
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { paddingValues ->
-            NavigationGraph(navController, paddingValues, scannerViewModel, spHelper)
+            NavigationGraph(navController, paddingValues, scannerViewModel, spHelper, networkUtils)
         }
     }
 }
@@ -114,13 +121,27 @@ fun BottomNavigationBar(navController: NavController) {
         }
     }
 }
+
+
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun NavigationGraph(
     navController: NavHostController,
     paddingValues: PaddingValues,
     scannerViewModel: ScannerViewModel,
-    spHelper: SPHelper
+    spHelper: SPHelper,
+    networkUtils: NetworkUtils
 ) {
+
+    var isOnline by rememberSaveable { mutableStateOf(networkUtils.isNetworkAvailable()) }
+
+    LaunchedEffect(Unit) {
+        networkUtils.observeNetworkState().collectLatest { isNetworkAvailable ->
+            isOnline = isNetworkAvailable
+        }
+    }
+
+
     // Учитываем paddingValues для отступов контента от верхней и нижней части экрана
     Box(
         modifier = Modifier
@@ -132,21 +153,25 @@ fun NavigationGraph(
     ) {
         NavHost(
             navController = navController,
-            startDestination = Screen.Inventory.route,
+            startDestination = "auth",
             modifier = Modifier.fillMaxSize()
         ) {
+
+
+            composable("auth") {
+                AuthScreen(navController = navController, scannerViewModel) // Display AuthScreen first
+            }
             composable(Screen.Inventory.route) {
-             InventoryScreen(scannerViewModel = scannerViewModel)
+                InventoryScreen(scannerViewModel = scannerViewModel)
             }
 
-            composable(Screen.Placement.route){
-                SearchScreen(
-                    navController = navController,
-                    scannerViewModel = scannerViewModel,
-                    spHelper = spHelper
-                ) {}
+            composable(Screen.Placement.route) {
+                if(isOnline) SearchScreen(navController,scannerViewModel, spHelper = spHelper){}
+                else  OfflinePlacementScreen(navController)
             }
-            
+
+
+
             // Экран снятия товара
             composable(Screen.Removal.route) {
                 SnyatieScanLocationScreen(
@@ -158,7 +183,7 @@ fun NavigationGraph(
             
             // Экран перемещения товара
             composable(Screen.Movement.route) {
-                ScanSourceLocationScreen(navController, scannerViewModel)
+                ScanSourceLocationScreen(navController, scannerViewModel, spHelper =  spHelper)
             }
             
             composable(Screen.Info.route) { 
@@ -181,7 +206,8 @@ fun NavigationGraph(
             composable("scan_buffer_location") {
                 ScanBufferLocationScreen(navController, spHelper = spHelper, scannerViewModel)
             }
-            
+
+
             // Экран срока годности
             composable("expiration_date") { 
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -194,15 +220,12 @@ fun NavigationGraph(
                 }
             }
 
-            // Экран поиска товаров
-            composable("product_search") {
-                ProductSearchScreen(navController = navController, scannerViewModel = scannerViewModel)
-            }
 
             composable(Routes.MOVE_PRODUCT) {
                 ScanSourceLocationScreen(
                     navController = navController,
-                    scannerViewModel = scannerViewModel
+                    scannerViewModel = scannerViewModel,
+                    spHelper = spHelper
                 )
             }
 

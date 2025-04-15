@@ -62,6 +62,24 @@ class MovementViewModel @Inject constructor(
 
     private val _moveQuantity = MutableLiveData<Int>()
     val moveQuantity: LiveData<Int> = _moveQuantity
+    private val _expirationDate = MutableLiveData<String>()
+    val expirationDate: LiveData<String> = _expirationDate
+
+    private val _conditionState = MutableLiveData<String>()
+    val conditionState: LiveData<String> = _conditionState
+
+    private val _conditionReason = MutableLiveData<String?>()
+    val conditionReason: LiveData<String?> = _conditionReason
+
+    fun setExpirationDate(date: String) {
+        _expirationDate.value = date
+        Log.d(TAG, "Установлен срок годности: $date")
+    }
+
+    fun setConditionState(state: String, reason: String? = null) {
+        _conditionState.value = state
+        _conditionReason.value = reason
+    }
 
     // Получение списка товаров в исходной ячейке
     fun getLocationItems(locationId: String) {
@@ -146,7 +164,10 @@ class MovementViewModel @Inject constructor(
         val sourceLocationId = _sourceLocation.value ?: return
         val targetLocationId = _targetLocation.value ?: return
         val quantity = _moveQuantity.value ?: return
-        
+        val conditionState = _conditionState.value?.toLowerCase() ?: return
+        val date = _expirationDate.value ?: return
+        val reason = _conditionReason.value?: ""
+
         Log.d(TAG, "Начало перемещения товара: ${item.name} из $sourceLocationId в $targetLocationId (количество: $quantity)")
         _moveProductState.value = MoveProductState.Loading
         
@@ -157,11 +178,12 @@ class MovementViewModel @Inject constructor(
                     sourceLocationId = sourceLocationId,
                     targetLocationId = targetLocationId,
                     quantity = quantity,
-                    conditionState = unit.conditionState,
-                    expirationDate = unit.expirationDate ?: ProductMovementHelper.DEFAULT_EXPIRATION_DATE,
+                    conditionState = conditionState,
+                    expirationDate = date,
                     executor = spHelper.getUserName() ?: "Пользователь",
                     prunitId = unit.prunitId.toString(),
-                    productQnt = spHelper.getProductQnt().toString()
+                    productQnt = spHelper.getProductQnt().toString(),
+                    reason = reason ?: ""
                 )
                 
                 if (response.success) {
@@ -182,17 +204,6 @@ class MovementViewModel @Inject constructor(
         }
     }
 
-    // Сброс всех данных перемещения
-    fun resetMovementData() {
-        Log.d(TAG, "Сброс данных перемещения")
-        _selectedItem.value = null
-        _selectedUnit.value = null
-        _sourceLocation.value = null
-        _targetLocation.value = null
-        _moveQuantity.value = null
-        _locationItemsState.value = LocationItemsState.Empty
-        _moveProductState.value = MoveProductState.Initial
-    }
 
     // Сброс результата перемещения для следующей операции
     fun resetMoveResult() {

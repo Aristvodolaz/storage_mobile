@@ -18,12 +18,15 @@ import com.komus.sorage_mobile.data.response.SearchResponse
 import com.komus.sorage_mobile.data.response.UnitResponse
 import com.komus.sorage_mobile.data.response.UpdateInventoryRequest
 import com.komus.sorage_mobile.data.response.SyncInventoryRequest
+import com.komus.sorage_mobile.data.model.StorageResponse
+import com.komus.sorage_mobile.data.response.EmptyCellsResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import retrofit2.http.PUT
+import retrofit2.Response
 
 interface StorageApi {
 
@@ -113,6 +116,32 @@ interface StorageApi {
     suspend fun confirmInventoryItem(
         @Body request: InventoryRequest
     ): BaseResponse
+
+    @GET("/api/storage/all")
+    suspend fun getAllStorageItems(
+        @Query("limit") limit: Int = 1000,
+        @Query("offset") offset: Int = 0,
+        @Query("id_sklad") warehouseId: Int = 85
+    ): StorageResponse
+
+    @GET("/api/storage/empty-cells")
+    suspend fun getEmptyCells(
+        @Query("id_sklad") skladId: Int
+    ): EmptyCellsResponse
+
+    @GET("api/storage/article-info")
+    suspend fun searchProductByArticleOrBarcode(
+        @Query("article") article: String? = null,
+        @Query("shk") shk: String? = null,
+        @Query("id_sklad") idSklad: Int
+    ): Response<ProductInfoResponse>
+
+    @GET("api/storage/items")
+    suspend fun getAllStorageItems(): StorageResponse
+
+    // Метод для обратной совместимости
+    @GET("api/storage/search")
+    suspend fun searchProductByArticleOrBarcode(query: String): StorageResponse
 
 }
 

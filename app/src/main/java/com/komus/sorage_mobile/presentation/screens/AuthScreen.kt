@@ -33,11 +33,12 @@ import androidx.compose.runtime.livedata.observeAsState
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.komus.sorage_mobile.R
+import com.komus.sorage_mobile.util.Screen
 
 @Composable
 fun AuthScreen(
     navController: NavController,
-    scannerViewModel: ScannerViewModel = hiltViewModel(),
+    scannerViewModel: ScannerViewModel,
     authViewModel: AuthViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -64,7 +65,7 @@ fun AuthScreen(
                 val username = (authState as AuthViewModel.AuthState.Success).user.name
                 scannerViewModel.clearBarcode() // Сброс после обработки
                 Log.d("AuthScreen", "Authentication success. Navigating to home: $username")
-                navController.navigate("task") {
+                navController.navigate(Screen.Placement.route) {
                     popUpTo("auth") { inclusive = true }
                 }
             }

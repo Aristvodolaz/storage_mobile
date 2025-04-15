@@ -1,6 +1,8 @@
 package com.komus.sorage_mobile.presentation.screens.movement
 
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -17,6 +19,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,14 +35,19 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.komus.scanner_module.ScannerViewModel
+import com.komus.sorage_mobile.data.model.ConditionReasons
 import com.komus.sorage_mobile.data.response.LocationItem
+import com.komus.sorage_mobile.domain.util.ExpirationDateValidator
 import com.komus.sorage_mobile.domain.viewModel.MovementViewModel
 import com.komus.sorage_mobile.presentation.components.LoadingIndicator
 import com.komus.sorage_mobile.presentation.components.ScanButton
 import com.komus.sorage_mobile.presentation.theme.Primary
 import com.komus.sorage_mobile.util.SPHelper
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 private const val TAG = "ScanSourceLocationScreen"
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ScanSourceLocationScreen(
     navController: NavController,
@@ -49,43 +58,38 @@ fun ScanSourceLocationScreen(
     var locationId by remember { mutableStateOf("") }
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val locationItemsState by movementViewModel.locationItemsState.collectAsStateWithLifecycle()
+
     var selectedItem by remember { mutableStateOf<LocationItem?>(null) }
     var showQuantityDialog by remember { mutableStateOf(false) }
+    var showExpirationAndConditionDialog by remember { mutableStateOf(false) }
     var showTargetLocationDialog by remember { mutableStateOf(false) }
+
     var moveQuantity by remember { mutableStateOf(0) }
     var targetLocation by remember { mutableStateOf("") }
 
-    // Вставка данных из barcodeData в поле ввода locationId
+    // Автоматический поиск товаров после сканирования
     LaunchedEffect(barcodeData) {
-        if (barcodeData.isNotEmpty() && !showTargetLocationDialog) {
-            locationId = barcodeData
-            scannerViewModel.clearBarcode()
-            movementViewModel.getLocationItems(locationId)
-        }
-    }
-
-    // Обработка сканирования целевой ячейки
-    LaunchedEffect(barcodeData) {
-        if (barcodeData.isNotEmpty() && showTargetLocationDialog) {
-            targetLocation = barcodeData
-            scannerViewModel.clearBarcode()
-            showTargetLocationDialog = false
-            movementViewModel.setTargetLocation(targetLocation)
-            movementViewModel.moveProduct()
+        if (barcodeData.isNotEmpty()) {
+            if (!showTargetLocationDialog) {
+                // Если не выбрана целевая ячейка, значит сканируем ячейку-источник
+                locationId = barcodeData
+                scannerViewModel.clearBarcode()
+                movementViewModel.getLocationItems(locationId)
+            } else {
+                // Если `showTargetLocationDialog` открыт – сканируем целевую ячейку
+                targetLocation = barcodeData
+                scannerViewModel.clearBarcode()
+                showTargetLocationDialog = false
+                movementViewModel.setTargetLocation(targetLocation)
+                movementViewModel.moveProduct()
+            }
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        "Выбор ячейки", 
-                        fontSize = 16.sp, 
-                        maxLines = 1, 
-                        overflow = TextOverflow.Ellipsis
-                    ) 
-                },
+                title = { Text("Выбор ячейки", fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(Icons.Filled.ArrowBack, contentDescription = "Назад")
@@ -98,10 +102,7 @@ fun ScanSourceLocationScreen(
         }
     ) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
@@ -109,66 +110,41 @@ fun ScanSourceLocationScreen(
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
             )
 
-            Row(
+            // Поле ввода ID ячейки
+            OutlinedTextField(
+                value = locationId,
+                onValueChange = { locationId = it },
+                label = { Text("ID ячейки", fontSize = 12.sp) },
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = locationId,
-                    onValueChange = { locationId = it },
-                    label = { Text("ID ячейки", fontSize = 12.sp) },
-                    modifier = Modifier.weight(1f),
-                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
-                    singleLine = true,
-                    leadingIcon = { 
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Поиск",
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    trailingIcon = {
-                        if (locationId.isNotEmpty()) {
-                            IconButton(
-                                onClick = { locationId = "" },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Clear,
-                                    contentDescription = "Очистить",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Поиск", modifier = Modifier.size(16.dp)) },
+                trailingIcon = {
+                    if (locationId.isNotEmpty()) {
+                        IconButton(onClick = { locationId = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Очистить", modifier = Modifier.size(16.dp))
                         }
                     }
-                )
-
-            }
+                }
+            )
 
             Spacer(modifier = Modifier.height(4.dp))
-            
+
+            // Кнопка "Найти"
             Button(
                 onClick = { movementViewModel.getLocationItems(locationId) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(40.dp),
+                modifier = Modifier.fillMaxWidth().height(40.dp),
                 enabled = locationId.isNotEmpty(),
                 shape = RoundedCornerShape(4.dp)
             ) {
-                Text(
-                    "НАЙТИ",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                Text("НАЙТИ", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
+            // Вывод списка товаров в ячейке
             when (locationItemsState) {
                 is MovementViewModel.LocationItemsState.Success -> {
                     val items = (locationItemsState as MovementViewModel.LocationItemsState.Success).items
@@ -188,69 +164,51 @@ fun ScanSourceLocationScreen(
                         }
                     }
                 }
-                is MovementViewModel.LocationItemsState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                }
-                is MovementViewModel.LocationItemsState.Error -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Card(
-                            backgroundColor = MaterialTheme.colors.error.copy(alpha = 0.1f),
-                            elevation = 0.dp,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = (locationItemsState as MovementViewModel.LocationItemsState.Error).message,
-                                color = MaterialTheme.colors.error,
-                                textAlign = TextAlign.Center,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
-                    }
-                }
-                is MovementViewModel.LocationItemsState.Empty -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "Отсканируйте ячейку или введите её ID",
-                            textAlign = TextAlign.Center,
-                            fontSize = 14.sp,
-                            color = Color.Gray
-                        )
-                    }
-                }
+                is MovementViewModel.LocationItemsState.Loading -> LoadingIndicator()
+                is MovementViewModel.LocationItemsState.Error -> Text(
+                    text = (locationItemsState as MovementViewModel.LocationItemsState.Error).message,
+                    color = Color.Red,
+                    modifier = Modifier.padding(16.dp)
+                )
+                is MovementViewModel.LocationItemsState.Empty -> Text(
+                    text = "Отсканируйте ячейку или введите её ID",
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp,
+                    color = Color.Gray
+                )
             }
         }
     }
 
+    // Диалог ввода количества
     if (showQuantityDialog && selectedItem != null) {
         CompactQuantityDialog(
             item = selectedItem!!,
             onConfirm = { quantity ->
-                movementViewModel.selectItem(selectedItem!!)
-                movementViewModel.setMoveQuantity(quantity)
-                spHelper.saveProductQnt(selectedItem!!.units[0].productQnt.toInt())
                 moveQuantity = quantity
                 showQuantityDialog = false
-                showTargetLocationDialog = true
+                showExpirationAndConditionDialog = true
             },
             onDismiss = { showQuantityDialog = false }
         )
     }
 
+    // Диалог ввода срока годности и состояния
+    if (showExpirationAndConditionDialog && selectedItem != null) {
+        ExpirationAndConditionDialog(
+            onConfirm = { expirationDate, condition, reason ->
+                movementViewModel.selectItem(selectedItem!!)
+                movementViewModel.setMoveQuantity(moveQuantity)
+                movementViewModel.setExpirationDate(expirationDate)
+                movementViewModel.setConditionState(condition, reason)
+                showExpirationAndConditionDialog = false
+                showTargetLocationDialog = true
+            },
+            onDismiss = { showExpirationAndConditionDialog = false }
+        )
+    }
+
+    // Диалог выбора целевой ячейки
     if (showTargetLocationDialog) {
         CompactTargetLocationDialog(
             onConfirm = { location ->
@@ -263,6 +221,253 @@ fun ScanSourceLocationScreen(
             scannerViewModel = scannerViewModel
         )
     }
+}
+
+@RequiresApi(Build.VERSION_CODES.O)
+@OptIn(ExperimentalMaterialApi::class)
+@Composable
+fun ExpirationAndConditionDialog(
+    onConfirm: (String, String, String?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var expirationDate by remember { mutableStateOf("") }
+    var condition by remember { mutableStateOf("Кондиция") }
+    var reason by remember { mutableStateOf("") }
+    var showReasonError by remember { mutableStateOf(false) }
+    var showExpirationAlert by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    val scrollState = rememberScrollState()
+
+    // Диалог предупреждения о сроке годности
+    if (showExpirationAlert) {
+        AlertDialog(
+            onDismissRequest = { showExpirationAlert = false },
+            title = { Text("Внимание!") },
+            text = { 
+                Column {
+                    Text("Срок годности товара истек.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showExpirationAlert = false
+                        condition = "Некондиция"
+                    }
+                ) {
+                    Text("Установить 'Некондиция'")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExpirationAlert = false }) {
+                    Text("Отмена")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "Срок годности и состояние",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+            ) {
+                OutlinedTextField(
+                    value = expirationDate,
+                    onValueChange = { 
+                        expirationDate = it
+                        // Проверяем срок годности при вводе
+                        if (it.isNotEmpty()) {
+                            try {
+                                val date = LocalDate.parse(it, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                                val isoDate = date.format(DateTimeFormatter.ISO_DATE)
+                                if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
+                                    showExpirationAlert = true
+                                }
+                            } catch (e: Exception) {
+                                // Игнорируем ошибки парсинга при вводе
+                            }
+                        }
+                    },
+                    label = { Text("Срок годности (ДД.ММ.ГГГГ)", fontSize = 12.sp) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        RadioButton(
+                            selected = condition == "Кондиция",
+                            onClick = { 
+                                // Проверяем срок годности при смене состояния
+                                if (expirationDate.isNotEmpty()) {
+                                    try {
+                                        val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                                        val isoDate = date.format(DateTimeFormatter.ISO_DATE)
+                                        if (ExpirationDateValidator.isExpired(isoDate)) {
+                                            showExpirationAlert = true
+                                            return@RadioButton
+                                        }
+                                    } catch (e: Exception) {
+                                        // Игнорируем ошибки парсинга
+                                    }
+                                }
+                                condition = "Кондиция"
+                                showReasonError = false
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Кондиция", fontSize = 14.sp)
+                    }
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        RadioButton(
+                            selected = condition == "Некондиция",
+                            onClick = { condition = "Некондиция" }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Некондиция", fontSize = 14.sp)
+                    }
+                }
+
+                if (condition == "Некондиция") {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = expanded,
+                        onExpandedChange = { expanded = !expanded },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = reason,
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { 
+                                Text(
+                                    if (reason.isEmpty()) "Выберите причину некондиции" else "Причина некондиции",
+                                    fontSize = 12.sp
+                                ) 
+                            },
+                            trailingIcon = {
+                                Icon(
+                                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                    "Развернуть",
+                                    Modifier.size(16.dp)
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            isError = showReasonError && reason.isEmpty()
+                        )
+                        
+                        ExposedDropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier
+                                .background(MaterialTheme.colors.surface)
+                                .heightIn(max = 200.dp)
+                        ) {
+                            ConditionReasons.reasons.forEach { reasonOption ->
+                                DropdownMenuItem(
+                                    onClick = {
+                                        reason = reasonOption
+                                        expanded = false
+                                        showReasonError = false
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            if (reason == reasonOption) 
+                                                MaterialTheme.colors.primary.copy(alpha = 0.1f) 
+                                            else 
+                                                MaterialTheme.colors.surface
+                                        )
+                                ) {
+                                    Text(
+                                        text = reasonOption,
+                                        fontSize = 12.sp,
+                                        color = if (reason == reasonOption) 
+                                            MaterialTheme.colors.primary 
+                                        else 
+                                            MaterialTheme.colors.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (showReasonError && reason.isEmpty()) {
+                        Text(
+                            text = "Выберите причину некондиции",
+                            color = MaterialTheme.colors.error,
+                            style = MaterialTheme.typography.caption,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (condition == "Некондиция" && reason.isEmpty()) {
+                        showReasonError = true
+                        return@Button
+                    }
+
+                    // Проверяем срок годности перед сохранением
+                    if (expirationDate.isNotEmpty()) {
+                        try {
+                            val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                            val isoDate = date.format(DateTimeFormatter.ISO_DATE)
+                            if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
+                                showExpirationAlert = true
+                                return@Button
+                            }
+                        } catch (e: Exception) {
+                            // Игнорируем ошибки парсинга
+                        }
+                    }
+
+                    onConfirm(expirationDate, condition, if (condition == "Некондиция") reason else null)
+                },
+                enabled = expirationDate.isNotEmpty() && (condition != "Некондиция" || reason.isNotEmpty())
+            ) {
+                Text("ОК", fontSize = 14.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", fontSize = 14.sp)
+            }
+        },
+        shape = RoundedCornerShape(8.dp)
+    )
 }
 
 @Composable

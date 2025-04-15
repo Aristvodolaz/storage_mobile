@@ -9,10 +9,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,7 +22,16 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
 import com.komus.sorage_mobile.domain.viewModel.ExpirationDateViewModel
+import com.komus.sorage_mobile.data.model.ConditionReasons
+import com.komus.sorage_mobile.domain.util.ExpirationDateValidator
+import com.komus.sorage_mobile.util.DateUtils
+import com.komus.sorage_mobile.util.ProductMovementHelper
 
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import android.util.Log
+
+@OptIn(ExperimentalMaterialApi::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ExpirationDateScreen(
@@ -36,9 +42,11 @@ fun ExpirationDateScreen(
     var days by remember { mutableStateOf("") }
     var months by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
-    var condition by remember { mutableStateOf<String?>(null) }
+    var condition by remember { mutableStateOf("Кондиция") }
     var reason by remember { mutableStateOf("") }
     var showReasonError by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+    var showExpirationAlert by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     // Автоматический расчет конечной даты
@@ -46,6 +54,38 @@ fun ExpirationDateScreen(
         if (startDate.isNotEmpty() && (days.isNotEmpty() || months.isNotEmpty())) {
             endDate = viewModel.calculateEndDate(startDate, days, months)
         }
+    }
+
+    // Диалог предупреждения о сроке годности
+    if (showExpirationAlert) {
+        AlertDialog(
+            onDismissRequest = { showExpirationAlert = false },
+            title = { Text("Внимание!") },
+            text = { 
+                Column {
+                    Text("Срок годности товара истек.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showExpirationAlert = false
+                        condition = "Некондиция"
+                    }
+                ) {
+                    Text("Установить 'Некондиция'")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExpirationAlert = false }) {
+                    Text("Отмена")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
+        )
     }
 
     Scaffold(
@@ -227,7 +267,7 @@ fun ExpirationDateScreen(
                 }
             }
             
-            // Карточка для выбора состояния
+            // Карточка выбора состояния товара
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -247,28 +287,32 @@ fun ExpirationDateScreen(
                     
                     Spacer(modifier = Modifier.height(4.dp))
                     
+                    // Радио-кнопки для выбора состояния
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(end = 8.dp)
                         ) {
                             RadioButton(
                                 selected = condition == "Кондиция",
                                 onClick = { 
                                     condition = "Кондиция"
+                                    reason = ""
                                     showReasonError = false
                                 },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = MaterialTheme.colors.primary
-                                ),
-                                modifier = Modifier.size(16.dp)
+                                )
                             )
                             Text(
                                 "Кондиция",
-                                fontSize = 10.sp
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start = 4.dp)
                             )
                         }
                         
@@ -278,118 +322,141 @@ fun ExpirationDateScreen(
                         ) {
                             RadioButton(
                                 selected = condition == "Некондиция",
-                                onClick = { 
-                                    condition = "Некондиция"
-                                    showReasonError = reason.isEmpty()
-                                },
+                                onClick = { condition = "Некондиция" },
                                 colors = RadioButtonDefaults.colors(
                                     selectedColor = MaterialTheme.colors.primary
-                                ),
-                                modifier = Modifier.size(16.dp)
+                                )
                             )
                             Text(
                                 "Некондиция",
-                                fontSize = 10.sp
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(start = 4.dp)
                             )
                         }
                     }
-
-                    // Поле для ввода причины некондиции
+                    
+                    // Выпадающий список причин некондиции
                     if (condition == "Некондиция") {
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = reason,
-                            onValueChange = { 
-                                reason = it
-                                showReasonError = it.isEmpty()
-                            },
-                            label = { 
-                                Text(
-                                    "Причина некондиции",
-                                    fontSize = 10.sp
-                                ) 
-                            },
-                            isError = showReasonError,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                            singleLine = true
-                        )
-                        if (showReasonError) {
+                        
+                        ExposedDropdownMenuBox(
+                            expanded = expanded,
+                            onExpandedChange = { expanded = !expanded },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            OutlinedTextField(
+                                value = reason,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { 
+                                    Text(
+                                        "Причина некондиции",
+                                        fontSize = 10.sp
+                                    ) 
+                                },
+                                trailingIcon = {
+                                    Icon(
+                                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                                        "Развернуть",
+                                        Modifier.size(16.dp)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                                isError = showReasonError && reason.isEmpty()
+                            )
+                            
+                            ExposedDropdownMenu(
+                                expanded = expanded,
+                                onDismissRequest = { expanded = false }
+                            ) {
+                                ConditionReasons.reasons.forEach { reasonOption ->
+                                    DropdownMenuItem(
+                                        onClick = {
+                                            reason = reasonOption
+                                            expanded = false
+                                            showReasonError = false
+                                        }
+                                    ) {
+                                        Text(
+                                            text = reasonOption,
+                                            fontSize = 12.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (showReasonError && reason.isEmpty()) {
                             Text(
-                                text = "Укажите причину некондиции",
+                                text = "Выберите причину некондиции",
                                 color = MaterialTheme.colors.error,
+                                style = MaterialTheme.typography.caption,
                                 fontSize = 10.sp,
-                                modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
                             )
                         }
                     }
                 }
             }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Кнопки навигации
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Button(
-                    onClick = { navController.popBackStack() },
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = Color.LightGray
-                    ),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        "НАЗАД",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold
+
+            // Кнопка сохранения
+            Button(
+                onClick = {
+                    if (condition == "Некондиция" && reason.isEmpty()) {
+                        showReasonError = true
+                        return@Button
+                    }
+
+                    // Проверяем срок годности перед сохранением
+                    val isoDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        try {
+                            val date = LocalDate.parse(endDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                            date.format(DateTimeFormatter.ISO_DATE)
+                        } catch (e: Exception) {
+                            Log.e("ExpirationDateScreen", "Ошибка преобразования даты: ${e.message}")
+                            ""
+                        }
+                    } else {
+                        DateUtils.convertToIsoFormat(endDate)
+                    }
+
+                    if (isoDate.isNotEmpty()) {
+                        val validatedIsoDate = ProductMovementHelper.processExpirationDate(isoDate)
+                        if (ExpirationDateValidator.isExpired(validatedIsoDate) && condition == "Кондиция") {
+                            showExpirationAlert = true
+                            return@Button
+                        }
+                    }
+                    
+                    viewModel.saveExpirationData(
+                        startDate = startDate,
+                        days = days,
+                        months = months,
+                        condition = condition,
+                        reason = reason
                     )
-                }
-                
-                Spacer(modifier = Modifier.width(4.dp))
-                
-                Button(
-                    onClick = {
-                        if (condition == "Некондиция" && reason.isEmpty()) {
-                            showReasonError = true
-                        } else {
-                            viewModel.saveExpirationData(
-                                startDate = startDate,
-                                days = days,
-                                months = months,
-                                condition = condition ?: "",
-                                reason = if (condition == "Некондиция") reason else null
-                            )
-                            navController.navigate("product_info")
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    enabled = startDate.isNotEmpty() && condition != null && 
-                            (condition != "Некондиция" || (condition == "Некондиция" && reason.isNotEmpty())),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            "ДАЛЕЕ",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = "Сохранить",
-                            modifier = Modifier.size(12.dp)
-                        )
+                    navController.navigate("scan_ir_location") {
+                        popUpTo("expiration_date") { inclusive = true }
                     }
-                }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+                    .height(36.dp),
+                enabled = startDate.isNotEmpty() && endDate.isNotEmpty() && 
+                         (condition == "Кондиция" || (condition == "Некондиция" && reason.isNotEmpty())),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.primary,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(
+                    "СОХРАНИТЬ",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
-            
-            // Добавляем дополнительное пространство внизу для удобства прокрутки
-            Spacer(modifier = Modifier.height(8.dp))
         }
     }
 }

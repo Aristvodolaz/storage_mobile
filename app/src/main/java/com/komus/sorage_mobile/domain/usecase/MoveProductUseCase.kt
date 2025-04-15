@@ -19,7 +19,8 @@ class MoveProductUseCase @Inject constructor(
         executor: String,
         skladId: String,
         expirationDate: String,
-        productQnt: String
+        productQnt: String,
+        reason: String
     ): BaseResponse {
         // Обрабатываем дату через ProductMovementHelper для обеспечения ISO формата
         val isoExpirationDate = ProductMovementHelper.processExpirationDate(expirationDate)
@@ -35,7 +36,8 @@ class MoveProductUseCase @Inject constructor(
             executor = executor,
             skladId = skladId,
             expirationDate = isoExpirationDate,
-            productQnt = productQnt
+            productQnt = productQnt,
+            reason = reason
         )
     }
 } 

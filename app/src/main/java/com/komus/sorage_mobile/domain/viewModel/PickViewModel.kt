@@ -107,7 +107,8 @@ class PickViewModel @Inject constructor(
                         prunitId = item.units.firstOrNull()?.prunitId?.toString() ?: "10",
                         quantity = quantity,
                         executor = executor,
-                        skladId = skladId
+                        skladId = skladId,
+                        productQnt = item.units[0].productQnt.toInt()
                     )
                 }
 
@@ -166,7 +167,9 @@ class PickViewModel @Inject constructor(
                     conditionState = conditionState,
                     executor = executor,
                     skladId = skladId,
-                    expirationDate = expirationDate
+                    expirationDate = expirationDate,
+                    productQnt = spHelper.getProductQnt().toString(),
+                    reason = ""
                 )
                 
                 if (response.success) {
