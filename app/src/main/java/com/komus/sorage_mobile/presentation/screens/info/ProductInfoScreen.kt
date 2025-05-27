@@ -144,10 +144,9 @@ fun ProductInfoScreen(
                         text = {
                             Text(
                                 text = when (type) {
-                                    ProductInfoViewModel.SearchType.LOCATION_ID -> "ШК"
-                                    ProductInfoViewModel.SearchType.LOCATION_NAME -> "Название"
+                                    ProductInfoViewModel.SearchType.LOCATION_ID -> "ШК ячейки"
                                     ProductInfoViewModel.SearchType.ARTICLE -> "Артикул"
-                                    ProductInfoViewModel.SearchType.EMPTY_CELLS -> "Ячейки"
+                                    ProductInfoViewModel.SearchType.EMPTY_CELLS -> "Пустые ячейки"
                                 },
                                 maxLines = 1,
                                 fontSize = 12.sp,
@@ -187,8 +186,7 @@ fun ProductInfoScreen(
                             label = {
                                 Text(
                                     when (uiState.searchType) {
-                                        ProductInfoViewModel.SearchType.LOCATION_ID -> "Штрих-код"
-                                        ProductInfoViewModel.SearchType.LOCATION_NAME -> "Название"
+                                        ProductInfoViewModel.SearchType.LOCATION_ID -> "ШК ячейки"
                                         ProductInfoViewModel.SearchType.ARTICLE -> "Артикул"
                                         ProductInfoViewModel.SearchType.EMPTY_CELLS -> "Ячейки"
                                     },
@@ -359,7 +357,7 @@ fun ProductInfoScreen(
                         }
                         
                         // Список мест хранения
-                        items(uiState.productInfo!!.items) { location ->
+                        items(uiState?.productInfo?.items ?: emptyList()) { location ->
                             CompactProductLocationCard(location = location)
                         }
                         

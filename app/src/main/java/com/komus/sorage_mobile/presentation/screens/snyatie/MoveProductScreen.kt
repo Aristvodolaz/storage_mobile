@@ -166,6 +166,7 @@ fun MoveProductScreen(
             pickViewModel.resetMoveProductState()
             pickViewModel.resetLocationItemsState()
         }
+        // Не сбрасываем состояние в случае ошибки
     }
     
     Scaffold(
@@ -787,8 +788,59 @@ fun MoveProductScreen(
                                     Text(
                                         text = (moveProductState as MoveProductState.Error).message,
                                         color = Color.Red,
-                                        textAlign = TextAlign.Center
+                                        textAlign = TextAlign.Center,
+                                        fontSize = 12.sp
                                     )
+                                    
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        // Кнопка повторной попытки
+                                        Button(
+                                            onClick = {
+                                                // Сбрасываем состояние ошибки и пробуем снова
+                                                pickViewModel.resetMoveProductState()
+                                                
+                                                // Повторяем попытку перемещения если все данные заполнены
+                                                if (selectedItem != null && quantity.isNotEmpty() && sourceLocationId.isNotEmpty() && targetLocationId.isNotEmpty()) {
+                                                    selectedItem!!.units[0].expirationDate?.let {
+                                                        pickViewModel.moveProduct(
+                                                            quantity = quantity.toInt(),
+                                                            conditionState = selectedItem!!.units[0].conditionState,
+                                                            expirationDate = it,
+                                                            executor = executor
+                                                        )
+                                                    }
+                                                }
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                backgroundColor = MaterialTheme.colors.primary
+                                            )
+                                        ) {
+                                            Text("Повторить", fontSize = 12.sp)
+                                        }
+                                        
+                                        // Кнопка отмены
+                                        Button(
+                                            onClick = {
+                                                pickViewModel.resetMoveProductState()
+                                                sourceLocationId = ""
+                                                targetLocationId = ""
+                                                quantity = "1"
+                                                selectedItem = null
+                                                showQuantityInput = false
+                                                scanMode = ScanMode.SOURCE_LOCATION
+                                            },
+                                            colors = ButtonDefaults.buttonColors(
+                                                backgroundColor = Color.Gray
+                                            )
+                                        ) {
+                                            Text("Отмена", fontSize = 12.sp)
+                                        }
+                                    }
                                 }
                             }
                         }

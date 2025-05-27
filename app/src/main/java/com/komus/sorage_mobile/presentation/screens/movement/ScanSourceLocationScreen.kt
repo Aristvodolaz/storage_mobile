@@ -58,14 +58,45 @@ fun ScanSourceLocationScreen(
     var locationId by remember { mutableStateOf("") }
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val locationItemsState by movementViewModel.locationItemsState.collectAsStateWithLifecycle()
+    val moveProductState by movementViewModel.moveProductState.collectAsStateWithLifecycle()
 
     var selectedItem by remember { mutableStateOf<LocationItem?>(null) }
     var showQuantityDialog by remember { mutableStateOf(false) }
     var showExpirationAndConditionDialog by remember { mutableStateOf(false) }
     var showTargetLocationDialog by remember { mutableStateOf(false) }
+    var showErrorDialog by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     var moveQuantity by remember { mutableStateOf(0) }
     var targetLocation by remember { mutableStateOf("") }
+
+    // Новое состояние для успешного диалога
+    var showSuccessDialog by remember { mutableStateOf(false) }
+    var successMessage by remember { mutableStateOf("") }
+
+    // Обновление данных при возврате на экран
+    LaunchedEffect(Unit) {
+        if (locationId.isNotEmpty()) {
+            movementViewModel.getLocationItems(locationId)
+        }
+    }
+
+    // Обработка состояния перемещения
+    LaunchedEffect(moveProductState) {
+        when (moveProductState) {
+            is MovementViewModel.MoveProductState.Error -> {
+                errorMessage = (moveProductState as MovementViewModel.MoveProductState.Error).message
+                showErrorDialog = true
+            }
+            is MovementViewModel.MoveProductState.Success -> {
+                // Показываем диалог об успехе
+                successMessage = "Перемещение успешно выполнено"
+                showSuccessDialog = true
+                movementViewModel.resetMoveResult()
+            }
+            else -> {}
+        }
+    }
 
     // Автоматический поиск товаров после сканирования
     LaunchedEffect(barcodeData) {
@@ -221,6 +252,80 @@ fun ScanSourceLocationScreen(
             scannerViewModel = scannerViewModel
         )
     }
+
+    // Диалог ошибки
+    if (showErrorDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showErrorDialog = false
+                movementViewModel.resetMoveResult()
+            },
+            title = { 
+                Text(
+                    "Ошибка перемещения",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                ) 
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = errorMessage,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colors.error
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showErrorDialog = false
+                        movementViewModel.resetMoveResult()
+                    }
+                ) {
+                    Text("ОК", fontSize = 14.sp)
+                }
+            },
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+
+    // Диалог успеха
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showSuccessDialog = false
+                navController.popBackStack()
+            },
+            title = {
+                Text(
+                    "Успех",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = successMessage,
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colors.primary
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSuccessDialog = false
+                        navController.popBackStack()
+                    }
+                ) {
+                    Text("ОК", fontSize = 14.sp)
+                }
+            },
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
 }
 
 @RequiresApi(Build.VERSION_CODES.O)
@@ -231,12 +336,59 @@ fun ExpirationAndConditionDialog(
     onDismiss: () -> Unit
 ) {
     var expirationDate by remember { mutableStateOf("") }
+    var months by remember { mutableStateOf("") }
+    var days by remember { mutableStateOf("") }
     var condition by remember { mutableStateOf("Кондиция") }
     var reason by remember { mutableStateOf("") }
     var showReasonError by remember { mutableStateOf(false) }
     var showExpirationAlert by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+
+    // Функция для расчета конечной даты
+    fun calculateFinalDate(): String {
+        if (expirationDate.isEmpty()) return ""
+        
+        try {
+            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            val baseDate = LocalDate.parse(expirationDate, formatter)
+            var finalDate = baseDate
+            
+            // Сначала добавляем месяцы
+            if (months.isNotEmpty()) {
+                val monthsToAdd = months.toIntOrNull() ?: 0
+                if (monthsToAdd > 0) {
+                    finalDate = finalDate.plusMonths(monthsToAdd.toLong())
+                }
+            }
+            
+            // Затем добавляем дни
+            if (days.isNotEmpty()) {
+                val daysToAdd = days.toIntOrNull() ?: 0
+                if (daysToAdd > 0) {
+                    finalDate = finalDate.plusDays(daysToAdd.toLong())
+                }
+            }
+            
+            return finalDate.format(formatter)
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при расчете даты: ${e.message}")
+            return expirationDate
+        }
+    }
+
+    // Функция для проверки срока годности
+    fun checkExpirationDate(date: String): Boolean {
+        try {
+            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            val parsedDate = LocalDate.parse(date, formatter)
+            val isoDate = parsedDate.format(DateTimeFormatter.ISO_DATE)
+            return ExpirationDateValidator.isExpired(isoDate)
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при проверке срока годности: ${e.message}")
+            return false
+        }
+    }
 
     // Диалог предупреждения о сроке годности
     if (showExpirationAlert) {
@@ -291,14 +443,9 @@ fun ExpirationAndConditionDialog(
                         expirationDate = it
                         // Проверяем срок годности при вводе
                         if (it.isNotEmpty()) {
-                            try {
-                                val date = LocalDate.parse(it, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                val isoDate = date.format(DateTimeFormatter.ISO_DATE)
-                                if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
-                                    showExpirationAlert = true
-                                }
-                            } catch (e: Exception) {
-                                // Игнорируем ошибки парсинга при вводе
+                            val finalDate = calculateFinalDate()
+                            if (checkExpirationDate(finalDate) && condition == "Кондиция") {
+                                showExpirationAlert = true
                             }
                         }
                     },
@@ -306,6 +453,60 @@ fun ExpirationAndConditionDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = months,
+                        onValueChange = { 
+                            if (it.all { char -> char.isDigit() }) {
+                                months = it
+                                // Пересчитываем итоговую дату при изменении месяцев
+                                if (expirationDate.isNotEmpty()) {
+                                    val finalDate = calculateFinalDate()
+                                    if (checkExpirationDate(finalDate) && condition == "Кондиция") {
+                                        showExpirationAlert = true
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("Месяцы", fontSize = 12.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    OutlinedTextField(
+                        value = days,
+                        onValueChange = { 
+                            if (it.all { char -> char.isDigit() }) {
+                                days = it
+                                // Пересчитываем итоговую дату при изменении дней
+                                if (expirationDate.isNotEmpty()) {
+                                    val finalDate = calculateFinalDate()
+                                    if (checkExpirationDate(finalDate) && condition == "Кондиция") {
+                                        showExpirationAlert = true
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text("Дни", fontSize = 12.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (expirationDate.isNotEmpty() && (months.isNotEmpty() || days.isNotEmpty())) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Итоговая дата: ${calculateFinalDate()}",
+                        color = MaterialTheme.colors.primary,
+                        fontSize = 12.sp
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -454,7 +655,14 @@ fun ExpirationAndConditionDialog(
                         }
                     }
 
-                    onConfirm(expirationDate, condition, if (condition == "Некондиция") reason else null)
+                    // Используем итоговую дату, если были введены месяцы или дни
+                    val finalDate = if (months.isNotEmpty() || days.isNotEmpty()) {
+                        calculateFinalDate()
+                    } else {
+                        expirationDate
+                    }
+
+                    onConfirm(finalDate, condition, if (condition == "Некондиция") reason else null)
                 },
                 enabled = expirationDate.isNotEmpty() && (condition != "Некондиция" || reason.isNotEmpty())
             ) {
@@ -478,6 +686,8 @@ fun CompactQuantityDialog(
 ) {
     var quantity by remember { mutableStateOf("") }
     val availableQuantity = item.units.firstOrNull()?.quantity?.toIntOrNull() ?: 0
+    val productQnt = item.units.firstOrNull()?.productQnt?.toIntOrNull() ?: 1
+    val availableExQuantity = availableQuantity / productQnt
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     AlertDialog(
@@ -498,13 +708,11 @@ fun CompactQuantityDialog(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                
+
                 Text(
-                    text = "Доступно: $availableQuantity", 
-                    color = Color.Gray,
-                    fontSize = 12.sp
+                    text = "Доступное количество EX: $availableExQuantity \nОбщее кол-во: $availableQuantity\nВложенность ЕХ: $productQnt"
                 )
-                
+
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 OutlinedTextField(
@@ -513,9 +721,15 @@ fun CompactQuantityDialog(
                         if (it.all { char -> char.isDigit() }) {
                             quantity = it
                             errorMessage = null
+                            
+                            // Проверяем количество при вводе
+                            val quantityInt = it.toIntOrNull() ?: 0
+                            if (quantityInt > availableExQuantity) {
+                                errorMessage = "Максимум: $availableExQuantity EX"
+                            }
                         }
                     },
-                    label = { Text("Количество", fontSize = 12.sp) },
+                    label = { Text("Количество (EX)", fontSize = 12.sp) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
                     singleLine = true,
@@ -539,10 +753,11 @@ fun CompactQuantityDialog(
                     val quantityInt = quantity.toIntOrNull() ?: 0
                     if (quantityInt <= 0) {
                         errorMessage = "Число должно быть больше 0"
-                    } else if (quantityInt > availableQuantity) {
-                        errorMessage = "Максимум: $availableQuantity"
+                    } else if (quantityInt > availableExQuantity) {
+                        errorMessage = "Максимум: $availableExQuantity EX"
                     } else {
-                        onConfirm(quantityInt)
+                        // Умножаем на productQnt для получения общего количества
+                        onConfirm(quantityInt * productQnt)
                     }
                 },
                 enabled = quantity.isNotEmpty()

@@ -157,7 +157,6 @@ class PickViewModel @Inject constructor(
                 val skladId = if (_skladId.isNotEmpty()) _skladId else spHelper.getSkladId()
                 val prunitId = item.units.firstOrNull()?.prunitId?.toString() ?: "10"
                 
-                // ProductMovementHelper сам обработает преобразование даты внутри MoveProductUseCase
                 val response = moveProductUseCase(
                     productId = item.id.toString(),
                     sourceLocationId = _sourceLocationId,
@@ -176,12 +175,16 @@ class PickViewModel @Inject constructor(
                     Log.d("PickViewModel", "Товар успешно перемещен")
                     _moveProductState.value = MoveProductState.Success
                 } else {
-                    Log.e("PickViewModel", "Ошибка перемещения товара: ${response.message}")
-                    _moveProductState.value = MoveProductState.Error(response.message ?: "Ошибка перемещения товара")
+                    Log.e("PickViewModel", "Ошибка при перемещении: ${response}")
+                    _moveProductState.value = MoveProductState.Error(
+                        (response ?: "Неизвестная ошибка при перемещении товара").toString()
+                    )
                 }
             } catch (e: Exception) {
-                Log.e("PickViewModel", "Исключение при перемещении товара: ${e.message}")
-                _moveProductState.value = MoveProductState.Error(e.message ?: "Произошла ошибка при перемещении товара")
+                Log.e("PickViewModel", "Исключение при перемещении: ${e.message}", e)
+                _moveProductState.value = MoveProductState.Error(
+                    e.message ?: "Произошла ошибка при перемещении товара"
+                )
             }
         }
     }

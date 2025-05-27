@@ -588,6 +588,7 @@ fun UpdateQuantityDialog(
     var reason by remember { mutableStateOf(item.reason ?: "") }
     var showReasonError by remember { mutableStateOf(false) }
     var showExpirationAlert by remember { mutableStateOf(false) }
+    var showExpirationRequiredAlert by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberScrollState()
@@ -617,6 +618,32 @@ fun UpdateQuantityDialog(
             dismissButton = {
                 TextButton(onClick = { showExpirationAlert = false }) {
                     Text("Отмена")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
+        )
+    }
+    
+    // Диалог предупреждения об обязательном вводе срока годности
+    if (showExpirationRequiredAlert) {
+        AlertDialog(
+            onDismissRequest = { showExpirationRequiredAlert = false },
+            title = { Text("Внимание!") },
+            text = { 
+                Column {
+                    Text("Для состояния 'Кондиция' необходимо указать срок годности.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Пожалуйста, заполните поле срока годности.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showExpirationRequiredAlert = false
+                    }
+                ) {
+                    Text("ОК")
                 }
             },
             backgroundColor = Color.White,
@@ -678,6 +705,15 @@ fun UpdateQuantityDialog(
                     text = "Срок годности (дд.мм.гггг):",
                     fontSize = 12.sp
                 )
+                
+                if (condition == "Кондиция") {
+                    Text(
+                        text = "* обязательное поле",
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colors.primary,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -699,7 +735,8 @@ fun UpdateQuantityDialog(
                         }
                     },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    isError = condition == "Кондиция" && expirationDate.isEmpty()
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -723,7 +760,12 @@ fun UpdateQuantityDialog(
                             selected = condition == "Кондиция",
                             onClick = { 
                                 // Проверяем срок годности при смене состояния
-                                if (expirationDate.isNotEmpty()) {
+                                if (expirationDate.isEmpty()) {
+                                    // Если срок годности не указан, показываем предупреждение
+                                    showExpirationRequiredAlert = true
+                                    return@RadioButton
+                                }
+                                
                                     try {
                                         val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
                                         val isoDate = date.format(DateTimeFormatter.ISO_DATE)
@@ -732,9 +774,11 @@ fun UpdateQuantityDialog(
                                             return@RadioButton
                                         }
                                     } catch (e: Exception) {
-                                        // Игнорируем ошибки парсинга
+                                    // Если формат даты неверный, также показываем предупреждение
+                                    showExpirationRequiredAlert = true
+                                    return@RadioButton
                                     }
-                                }
+                                
                                 condition = "Кондиция"
                                 showReasonError = false
                             },
@@ -872,17 +916,27 @@ fun UpdateQuantityDialog(
                             return@Button
                         }
                         
-                        // Проверяем срок годности перед сохранением
-                        if (expirationDate.isNotEmpty()) {
+                        if (condition == "Кондиция") {
+                            // Проверяем, указан ли срок годности для кондиционного товара
+                            if (expirationDate.isEmpty()) {
+                                showExpirationRequiredAlert = true
+                                return@Button
+                            }
+                            
+                            // Проверяем валидность даты
                             try {
                                 val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
                                 val isoDate = date.format(DateTimeFormatter.ISO_DATE)
-                                if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
+                                
+                                // Проверяем, не истек ли срок годности
+                                if (ExpirationDateValidator.isExpired(isoDate)) {
                                     showExpirationAlert = true
                                     return@Button
                                 }
                             } catch (e: Exception) {
-                                // Игнорируем ошибки парсинга
+                                // Если формат даты неверный, показываем предупреждение
+                                showExpirationRequiredAlert = true
+                                return@Button
                             }
                         }
                         

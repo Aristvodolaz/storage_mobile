@@ -24,7 +24,6 @@ class ProductInfoViewModel @Inject constructor(
     // Типы поиска, которые пользователь может выбрать
     enum class SearchType {
         LOCATION_ID,
-        LOCATION_NAME,
         ARTICLE,
         EMPTY_CELLS  // Новый тип поиска
     }
@@ -96,7 +95,6 @@ class ProductInfoViewModel @Inject constructor(
             try {
                 when (_uiState.value.searchType) {
                     SearchType.LOCATION_ID -> searchByLocationId(query)
-                    SearchType.LOCATION_NAME -> searchByLocationName(query)
                     SearchType.ARTICLE -> searchByArticle(query)
                     SearchType.EMPTY_CELLS -> searchEmptyCells() // добавлено
                 }

@@ -33,7 +33,7 @@ fun ProductInfoScreen(
     placementViewModel: PlacementViewModel = hiltViewModel()
 ) {
     val productId = spHelper.getProductId()
-    val brief = spHelper.getBrief()
+    val brief = spHelper.getTypeBrief()
     val fullQnt = spHelper.getFullQnt()
     val srokGodnosti = spHelper.getSrokGodnosti()
     val condition = spHelper.getCondition()
@@ -164,9 +164,9 @@ fun ProductInfoScreen(
                         style = MaterialTheme.typography.body1
                     )
                 }
-                
+
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
-                
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -181,7 +181,7 @@ fun ProductInfoScreen(
                         style = MaterialTheme.typography.body1
                     )
                 }
-                
+
                 Divider(modifier = Modifier.padding(vertical = 8.dp))
                 
                 Row(

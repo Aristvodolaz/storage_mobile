@@ -291,6 +291,8 @@ fun UnitSelectionScreen(
                                     val fullQnt = quantity.toInt() * selectedUnit!!.productQnt
                                             // Сохраняем информацию о единице хранения
                                             spHelper.saveBrief(selectedUnit!!.type.toString())
+
+                                    spHelper.saveTypeBrief(selectedUnit!!.typeName)
                                             // Сохраняем артикул товара
                                             spHelper.saveProductId(productId)
                                     spHelper.saveProductQnt(selectedUnit!!.productQnt)

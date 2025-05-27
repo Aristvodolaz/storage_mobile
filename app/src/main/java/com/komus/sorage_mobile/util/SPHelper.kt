@@ -20,6 +20,14 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
         return sharedPreferences.getString("brief", "") ?: ""
     }
 
+    fun saveTypeBrief(brief: String) {
+        sharedPreferences.edit().putString("briefType", brief).apply()
+    }
+
+    fun getTypeBrief(): String {
+        return sharedPreferences.getString("briefType", "") ?: ""
+    }
+
     fun saveFullQnt(fullQnt: Int) {
         sharedPreferences.edit().putInt("fullQnt", fullQnt).apply()
     }

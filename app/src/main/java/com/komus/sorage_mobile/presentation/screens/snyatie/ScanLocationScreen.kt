@@ -115,6 +115,7 @@ fun ScanLocationScreen(
             selectedItem = null
             scanMode = ScanMode.LOCATION
         }
+        // Не закрываем диалог в случае ошибки
     }
     
     // Диалог ввода количества для снятия товара
@@ -282,6 +283,22 @@ fun ScanLocationScreen(
                                         color = MaterialTheme.colors.error,
                                         style = MaterialTheme.typography.caption
                                     )
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    Button(
+                                        onClick = {
+                                            // Сбрасываем состояние ошибки и пробуем снова
+                                            pickViewModel.resetPickState()
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            backgroundColor = MaterialTheme.colors.error,
+                                            contentColor = Color.White
+                                        ),
+                                        modifier = Modifier.align(Alignment.End)
+                                    ) {
+                                        Text("ПОПРОБОВАТЬ СНОВА", fontSize = 10.sp)
+                                    }
                                 }
                             }
                         }
@@ -338,6 +355,7 @@ fun ScanLocationScreen(
                                     qnt,
                                     spHelper.getUserName()
                                 )
+                                // Не закрываем диалог здесь, он закроется только при успешном результате
                             }
                         } else {
                             validationError = "Введите количество"
