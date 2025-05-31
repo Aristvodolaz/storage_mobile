@@ -168,14 +168,14 @@ fun ScanLocationScreen(
 
 
                     Text(
-                        text = "Доступное количество: $justCoun",
+                        text = "Доступное количество ЕХ для снятия: $justCoun",
                         style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
                         fontSize = 10.sp
                     )
                     Text(
-                        text = "Количество в еденицах: $availableQuantity",
+                        text = "Общее кол-во в ед.: $availableQuantity",
                         style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
@@ -186,7 +186,7 @@ fun ScanLocationScreen(
                     
                     // Поле ввода количества
                     Text(
-                        text = "Введите количество для снятия:",
+                        text = "Введите количество для снятия(в ЕХ):",
                         style = MaterialTheme.typography.caption,
                         fontSize = 10.sp
                     )

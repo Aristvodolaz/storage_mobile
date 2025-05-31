@@ -32,6 +32,8 @@ import com.komus.sorage_mobile.presentation.components.LoadingIndicator
 import com.komus.sorage_mobile.presentation.components.ScanButton
 import com.komus.sorage_mobile.presentation.theme.Primary
 import kotlinx.coroutines.flow.collectLatest
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun ProductInfoScreen(
@@ -428,8 +430,32 @@ fun CompactLocationProductCard(product: LocationProduct) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                CompactInfoItem(label = "Ячейка:", value = product.locationId ?: "", modifier = Modifier.weight(1f))
-                CompactInfoItem(label = "Кол-во:", value = product.quantity?.toString() ?: "0", modifier = Modifier.weight(1f))
+                CompactInfoItem(label = "Ячейка:", value = product.wrShk ?: "", modifier = Modifier.weight(1f))
+                
+                // Получаем первый элемент из массива units, если он есть
+                product.units.firstOrNull()?.let { unit ->
+                    CompactInfoItem(
+                        label = "Кол-во EХ:",     
+                        value = try {
+                            val pQnt = unit.productQnt.toIntOrNull() ?: 0
+                            if (pQnt > 0) {
+                                val result = unit.quantity.toFloat() / pQnt.toFloat()
+                                result.toInt().toString()
+                            } else "0"
+                        } catch (e: Exception) {
+                            "0"
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                CompactInfoItem(
+                    label = "Кол-во ед:",
+                        value = unit.quantity.toString(),
+                    modifier = Modifier.weight(1f)
+                )
+                } ?: run {
+                    CompactInfoItem(label = "Кол-во EХ:", value = "0", modifier = Modifier.weight(1f))
+                    CompactInfoItem(label = "Кол-во ед:", value = "0", modifier = Modifier.weight(1f))
+                }
             }
             
             // Срок годности и состояние, если они есть
@@ -437,14 +463,15 @@ fun CompactLocationProductCard(product: LocationProduct) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                if (product.expirationDate != null) {
-                    CompactInfoItem(label = "Годен до:", value = product.expirationDate, modifier = Modifier.weight(1f))
+                val unit = product.units.firstOrNull()
+                if (unit?.expirationDate != null) {
+                    CompactInfoItem(label = "Годен до:", value = unit.expirationDate, modifier = Modifier.weight(1f))
                 } else {
                     CompactInfoItem(label = "Годен до:", value = "Не указано", modifier = Modifier.weight(1f))
                 }
                 
-                if (product.conditionState != null) {
-                    CompactInfoItem(label = "Сост.:", value = product.conditionState, modifier = Modifier.weight(1f))
+                if (unit?.conditionState != null) {
+                    CompactInfoItem(label = "Сост.:", value = unit.conditionState, modifier = Modifier.weight(1f))
                 } else {
                     CompactInfoItem(label = "Сост.:", value = "Не указано", modifier = Modifier.weight(1f))
                 }
@@ -516,8 +543,18 @@ fun CompactProductLocationCard(location: ProductLocation) {
                     modifier = Modifier.weight(1f)
                 )
                 CompactInfoItem(
-                    label = "Кол-во:", 
-                    value = location.quantity?.toString() ?: "0", 
+                    label = "Кол-во EX:",
+                    value = try {
+                        val pQnt = location.productQnt.toString().toIntOrNull() ?: 0
+                        if (pQnt > 0) (location.quantity / pQnt).toString() else "0"
+                    } catch (e: Exception) {
+                        "0"
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                CompactInfoItem(
+                    label = "Кол-во ед:",
+                    value = location.quantity.toString(),
                     modifier = Modifier.weight(1f)
                 )
 

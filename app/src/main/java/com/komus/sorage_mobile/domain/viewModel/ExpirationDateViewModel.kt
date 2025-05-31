@@ -75,7 +75,7 @@ class ExpirationDateViewModel @Inject constructor(
                 val isoDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     // Используем LocalDate для Android 8.0+
                     val date = LocalDate.parse(localDate, dateFormatter)
-                    date.format(dateFormatter)
+                    date.format(DateTimeFormatter.ISO_DATE)
                 } else {
                     // Используем DateUtils для старых версий Android
                     DateUtils.convertToIsoFormat(localDate)
@@ -93,26 +93,28 @@ class ExpirationDateViewModel @Inject constructor(
                 Timber.d("Итоговый ISO формат даты: $validatedIsoDate")
 
                 // Проверяем валидность срока годности для указанного состояния
-                if (!ExpirationDateValidator.isValidForCondition(validatedIsoDate, condition)) {
+                // Разрешаем сохранение для некондиции даже с истекшим сроком
+                if (ExpirationDateValidator.isExpired(validatedIsoDate) && condition == "Кондиция") {
                     _errorMessage.value = "Невозможно установить состояние 'Кондиция' для товара с истекшим сроком годности"
                     return@launch
                 }
                 
                 // Проверяем, что для некондиции указана валидная причина
-                if (condition == "Некондиция") {
-                    val nonConformityReason = NonConformityReason.fromDisplayName(reason ?: "")
-                    if (nonConformityReason == null) {
+                if (condition == "Некондиция" && reason.isNullOrEmpty()) {
                         _errorMessage.value = "Для некондиции необходимо указать причину"
                         return@launch
-                    }
                 }
-                
+
+                Log.d("DATE", validatedIsoDate)
+                Log.d("condition", condition)
+
+                // Сохраняем все данные
                 spHelper.saveSrokGodnosti(validatedIsoDate)
                 spHelper.saveCondition(condition)
                 
-                // Сохраняем причину некондиции
-                if (condition == "Некондиция") {
-                    spHelper.saveReason(reason ?: "")
+                // Сохраняем причину некондиции если она указана
+                if (condition == "Некондиция" && !reason.isNullOrEmpty()) {
+                    spHelper.saveReason(reason)
                 }
                 
                 _errorMessage.value = null

@@ -173,6 +173,7 @@ class MovementViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
+                val productQnt = unit.productQnt?.toString() ?: "0"
                 val response = movementRepository.moveProduct(
                     productId = item.article,
                     sourceLocationId = sourceLocationId,
@@ -182,7 +183,7 @@ class MovementViewModel @Inject constructor(
                     expirationDate = date,
                     executor = spHelper.getUserName() ?: "Пользователь",
                     prunitId = unit.prunitId.toString(),
-                    productQnt = unit.productQnt
+                    productQnt = productQnt,
                     reason = reason ?: ""
                 )
                 
@@ -197,29 +198,12 @@ class MovementViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Исключение при перемещении: ${e.message}", e)
-                // Пытаемся получить сообщение об ошибке из ответа API
-                if (e is retrofit2.HttpException) {
-                    try {
-                        val errorBody = e.response()?.errorBody()?.string()
-                        val errorResponse = com.google.gson.Gson().fromJson(errorBody, Map::class.java)
-                        val errorMessage = errorResponse["message"] as? String
-                        _moveProductState.value = MoveProductState.Error(
-                            errorMessage ?: "Произошла ошибка при перемещении товара"
-                        )
-                    } catch (parseError: Exception) {
-                        _moveProductState.value = MoveProductState.Error(
-                            "Произошла ошибка при перемещении товара"
-                        )
-                    }
-                } else {
-                    _moveProductState.value = MoveProductState.Error(
-                        e.message ?: "Произошла ошибка при перемещении товара"
-                    )
-                }
+                _moveProductState.value = MoveProductState.Error(
+                    e.message ?: "Произошла ошибка при перемещении товара"
+                )
             }
         }
     }
-
 
     // Сброс результата перемещения для следующей операции
     fun resetMoveResult() {

@@ -13,8 +13,16 @@ data class LocationProduct(
     @SerializedName("name") val name: String,
     @SerializedName("shk") val shk: String,
     @SerializedName("article") val article: String,
-    @SerializedName("locationId") val locationId: String,
+    @SerializedName("idSklad") val idSklad: Int,
+    @SerializedName("wrShk") val wrShk: String,
+    @SerializedName("units") val units: List<Units>
+)
+
+data class Units(
+    @SerializedName("prunitId") val prunitId: Int,
+    @SerializedName("prunitName") val prunitName: String,
     @SerializedName("quantity") val quantity: Int,
-    @SerializedName("conditionState") val conditionState: String?,
-    @SerializedName("expirationDate") val expirationDate: String?
-) 
+    @SerializedName("productQnt") val productQnt: String,
+    @SerializedName("conditionState") val conditionState: String,
+    @SerializedName("expirationDate") val expirationDate: String
+)

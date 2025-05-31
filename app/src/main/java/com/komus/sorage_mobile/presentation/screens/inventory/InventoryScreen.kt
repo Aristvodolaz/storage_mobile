@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
+import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Card
 import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Divider
@@ -76,6 +77,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.komus.scanner_module.ScannerViewModel
@@ -88,6 +90,7 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.*
 
+@OptIn(ExperimentalMaterialApi::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun InventoryScreen(
@@ -357,7 +360,9 @@ fun InventoryScreen(
     if (uiState.showUpdateDialog && uiState.selectedItem != null) {
         UpdateQuantityDialog(
             item = uiState.selectedItem!!,
-            onUpdate = { newQuantity, newExpirationDate, newCondition, newReason -> viewModel.updateItem(newQuantity, newExpirationDate, newCondition, newReason) },
+            onUpdate = { newQuantity, newExpirationDate, newCondition, newReason -> 
+                viewModel.updateItem(newQuantity, newExpirationDate, newCondition, newReason)
+            },
             onDismiss = { viewModel.hideDialogs() }
         )
     }
@@ -552,6 +557,37 @@ fun ItemDetailsDialog(
     )
 }
 
+@Composable
+fun InfoRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colors.onSurface
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = Color.Gray,
+            modifier = Modifier.weight(0.4f)
+        )
+        
+        Text(
+            text = value,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = valueColor,
+            modifier = Modifier.weight(0.6f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterialApi::class)
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -561,6 +597,9 @@ fun UpdateQuantityDialog(
     onDismiss: () -> Unit
 ) {
     var quantity by remember { mutableStateOf(item.actualQuantity.toString()) }
+    var startDate by remember { mutableStateOf("") }
+    var days by remember { mutableStateOf("") }
+    var months by remember { mutableStateOf("") }
     var expirationDate by remember { 
         mutableStateOf(
             try {
@@ -590,76 +629,61 @@ fun UpdateQuantityDialog(
     var showExpirationAlert by remember { mutableStateOf(false) }
     var showExpirationRequiredAlert by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
+    var skipExpirationDate by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
-    val scrollState = rememberScrollState()
-    
-    // Диалог предупреждения о сроке годности
-    if (showExpirationAlert) {
-        AlertDialog(
-            onDismissRequest = { showExpirationAlert = false },
-            title = { Text("Внимание!") },
-            text = { 
-                Column {
-                    Text("Срок годности товара истек.")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showExpirationAlert = false
-                        condition = "Некондиция"
+
+    // Функция для расчета даты окончания срока годности
+    fun calculateExpirationDate() {
+        if (skipExpirationDate) return
+        
+        try {
+            if (startDate.isNotEmpty()) {
+                val date = LocalDate.parse(startDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                val daysToAdd = days.toIntOrNull() ?: 0
+                val monthsToAdd = months.toIntOrNull() ?: 0
+                
+                val calculatedDate = date
+                    .plusMonths(monthsToAdd.toLong())
+                    .plusDays(daysToAdd.toLong())
+                
+                expirationDate = calculatedDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                
+                // Проверяем, не истек ли срок годности
+                val isoDate = calculatedDate.format(DateTimeFormatter.ISO_DATE)
+                if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
+                    showExpirationAlert = true
                     }
-                ) {
-                    Text("Установить 'Некондиция'")
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExpirationAlert = false }) {
-                    Text("Отмена")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
+        } catch (e: Exception) {
+            // Игнорируем ошибки парсинга при вводе
+        }
     }
-    
-    // Диалог предупреждения об обязательном вводе срока годности
-    if (showExpirationRequiredAlert) {
-        AlertDialog(
-            onDismissRequest = { showExpirationRequiredAlert = false },
-            title = { Text("Внимание!") },
-            text = { 
-                Column {
-                    Text("Для состояния 'Кондиция' необходимо указать срок годности.")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Пожалуйста, заполните поле срока годности.")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showExpirationRequiredAlert = false
-                    }
-                ) {
-                    Text("ОК")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
-    }
-    
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Изменить данные товара", fontSize = 16.sp) },
-        text = {
+
+    Dialog(
+        onDismissRequest = onDismiss
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(8.dp),
+            elevation = 8.dp
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scrollState)
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
             ) {
+                // Заголовок
+                Text(
+                    text = "Изменить данные товара",
+                    style = MaterialTheme.typography.h6,
+                    fontSize = 16.sp,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                // Название товара
                 Text(
                     text = item.name,
                     fontSize = 14.sp,
@@ -701,45 +725,153 @@ fun UpdateQuantityDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Срок годности (дд.мм.гггг):",
-                    fontSize = 12.sp
-                )
-                
-                if (condition == "Кондиция") {
+                if (!skipExpirationDate) {
                     Text(
-                        text = "* обязательное поле",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colors.primary,
-                        modifier = Modifier.padding(top = 2.dp)
+                        text = "Дата начала срока годности (дд.мм.гггг):",
+                        fontSize = 12.sp
                     )
-                }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = expirationDate,
-                    onValueChange = { 
-                        expirationDate = it
-                        // Проверяем срок годности при вводе
-                        if (it.isNotEmpty()) {
-                            try {
-                                val date = LocalDate.parse(it, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                val isoDate = date.format(DateTimeFormatter.ISO_DATE)
-                                if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
-                                    showExpirationAlert = true
-                                }
-                            } catch (e: Exception) {
-                                // Игнорируем ошибки парсинга при вводе
-                            }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = { 
+                                startDate = it
+                                calculateExpirationDate()
+                            },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                                imeAction = ImeAction.Next
+                            )
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                // Устанавливаем дату 01.01.2999 и очищаем поля
+                                startDate = ""
+                                days = ""
+                                months = ""
+                                expirationDate = "01.01.2999"
+                                skipExpirationDate = true
+                            },
+                            modifier = Modifier.height(56.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = Color(0xFF2196F3),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                "Пропустить СГ",
+                                fontSize = 10.sp
+                            )
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Месяцев:",
+                                fontSize = 12.sp
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                    OutlinedTextField(
+                                value = months,
+                        onValueChange = { 
+                                    months = it
+                                    calculateExpirationDate()
+                                },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Next
+                                )
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Дней:",
+                                fontSize = 12.sp
+                            )
+                            
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            OutlinedTextField(
+                                value = days,
+                                onValueChange = { 
+                                    days = it
+                                    calculateExpirationDate()
                     },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    isError = condition == "Кондиция" && expirationDate.isEmpty()
-                )
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                )
+                            )
+                        }
+                    }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Text(
+                        text = "Итоговый срок годности:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = if (expirationDate.isNotEmpty()) expirationDate else "Не рассчитан",
+                        fontSize = 14.sp,
+                        color = if (expirationDate.isNotEmpty()) MaterialTheme.colors.primary else Color.Gray
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                } else {
+                    Text(
+                        text = "Срок годности: 01.01.2999 (пропущен)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2196F3)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Button(
+                        onClick = {
+                            skipExpirationDate = false
+                            expirationDate = ""
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color.Gray,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Ввести дату вручную", fontSize = 10.sp)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
 
                 Text(
                     text = "Состояние товара:",
@@ -759,9 +891,7 @@ fun UpdateQuantityDialog(
                         RadioButton(
                             selected = condition == "Кондиция",
                             onClick = { 
-                                // Проверяем срок годности при смене состояния
                                 if (expirationDate.isEmpty()) {
-                                    // Если срок годности не указан, показываем предупреждение
                                     showExpirationRequiredAlert = true
                                     return@RadioButton
                                 }
@@ -774,7 +904,6 @@ fun UpdateQuantityDialog(
                                             return@RadioButton
                                         }
                                     } catch (e: Exception) {
-                                    // Если формат даты неверный, также показываем предупреждение
                                     showExpirationRequiredAlert = true
                                     return@RadioButton
                                     }
@@ -894,20 +1023,20 @@ fun UpdateQuantityDialog(
                         )
                     }
                 }
-            }
-        },
-        buttons = {
+
+                // Кнопки
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                        .padding(top = 24.dp),
                 horizontalArrangement = Arrangement.End
             ) {
-                TextButton(onClick = onDismiss) {
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.padding(end = 8.dp)
+                    ) {
                     Text("Отмена", fontSize = 12.sp)
                 }
-                
-                Spacer(modifier = Modifier.width(8.dp))
                 
                 Button(
                     onClick = {
@@ -916,34 +1045,31 @@ fun UpdateQuantityDialog(
                             return@Button
                         }
                         
-                        if (condition == "Кондиция") {
-                            // Проверяем, указан ли срок годности для кондиционного товара
+                        if (!skipExpirationDate && condition == "Кондиция") {
                             if (expirationDate.isEmpty()) {
                                 showExpirationRequiredAlert = true
                                 return@Button
                             }
                             
-                            // Проверяем валидность даты
                             try {
                                 val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
                                 val isoDate = date.format(DateTimeFormatter.ISO_DATE)
                                 
-                                // Проверяем, не истек ли срок годности
                                 if (ExpirationDateValidator.isExpired(isoDate)) {
                                     showExpirationAlert = true
                                     return@Button
                                 }
                             } catch (e: Exception) {
-                                // Если формат даты неверный, показываем предупреждение
                                 showExpirationRequiredAlert = true
                                 return@Button
                             }
                         }
                         
                         quantity.toIntOrNull()?.let { 
+                            val finalExpirationDate = if (skipExpirationDate) "01.01.2999" else expirationDate
                             onUpdate(
                                 it,
-                                expirationDate,
+                                finalExpirationDate,
                                 condition,
                                 if (condition == "Некондиция") reason else null
                             )
@@ -955,36 +1081,64 @@ fun UpdateQuantityDialog(
                 }
             }
         }
-    )
-}
-
-@Composable
-fun InfoRow(
-    label: String,
-    value: String,
-    valueColor: Color = MaterialTheme.colors.onSurface
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color.Gray,
-            modifier = Modifier.weight(0.4f)
+        }
+    }
+    
+    // Диалог предупреждения о сроке годности
+    if (showExpirationAlert) {
+        AlertDialog(
+            onDismissRequest = { showExpirationAlert = false },
+            title = { Text("Внимание!") },
+            text = { 
+                Column {
+                    Text("Срок годности товара истек.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showExpirationAlert = false
+                        condition = "Некондиция"
+                    }
+                ) {
+                    Text("Установить 'Некондиция'")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExpirationAlert = false }) {
+                    Text("Отмена")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
         )
-        
-        Text(
-            text = value,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            color = valueColor,
-            modifier = Modifier.weight(0.6f),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
+    }
+    
+    // Диалог предупреждения об обязательном вводе срока годности
+    if (showExpirationRequiredAlert) {
+        AlertDialog(
+            onDismissRequest = { showExpirationRequiredAlert = false },
+            title = { Text("Внимание!") },
+            text = { 
+                Column {
+                    Text("Для состояния 'Кондиция' необходимо указать срок годности.")
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Пожалуйста, заполните поле срока годности.")
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showExpirationRequiredAlert = false
+                    }
+                ) {
+                    Text("ОК")
+                }
+            },
+            backgroundColor = Color.White,
+            contentColor = MaterialTheme.colors.onSurface
         )
     }
 } 

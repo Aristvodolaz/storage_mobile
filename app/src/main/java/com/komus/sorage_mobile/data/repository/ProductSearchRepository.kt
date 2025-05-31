@@ -91,7 +91,8 @@ class ProductSearchRepository @Inject constructor(
                         name_wr = storageItemEntity.wrShk,
                         quantity = storageItemEntity.placeQnt,
                         conditionState = storageItemEntity.conditionState,
-                        expirationDate = storageItemEntity.expirationDate
+                        expirationDate = storageItemEntity.expirationDate,
+                        productQnt = storageItemEntity.productQnt
                     )
                 )
             )
@@ -103,31 +104,20 @@ class ProductSearchRepository @Inject constructor(
     suspend fun searchProductsByLocationId(locationId: String): LocationProductsResponse {
         val skladId = spHelper.getSkladId()
 
-        return if (networkUtils.isNetworkAvailable()) {
-            // If network is available, make the API request
-            api.getLocationProducts(locationId = locationId, skladId = skladId.toInt())
-        } else {
-            // If no network, query from the local database
-            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по locationId")
-            val localData = searchLocationProductsFromDatabase(locationId)
-            // Assuming you want to return a response in the same format as the API response
-            LocationProductsResponse(success = true, data = localData, message = null)
-        }
+        return api.getLocationProducts(locationId = locationId, skladId = skladId.toInt())
     }
 
     suspend fun searchProductsByLocationName(locationName: String): LocationProductsResponse {
         val skladId = spHelper.getSkladId()
 
-        return if (networkUtils.isNetworkAvailable()) {
-            // If network is available, make the API request
-            api.getLocationProducts(locationId = locationName, skladId = skladId.toInt())
-        } else {
-            // If no network, query from the local database
-            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по locationName")
-            val localData = searchLocationProductsFromDatabase(locationName)
-            // Assuming you want to return a response in the same format as the API response
-            LocationProductsResponse(success = true, data = localData, message = null)
-        }
+        return api.getLocationProducts(locationId = locationName, skladId = skladId.toInt())
+//        } else {
+//            // If no network, query from the local database
+//            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по locationName")
+////            val localData = searchLocationProductsFromDatabase(locationName)
+//            // Assuming you want to return a response in the same format as the API response
+////            LocationProductsResponse(success = true, data = localData, message = null)
+//        }
     }
 
     suspend fun searchProductsByArticle(article: String): ProductInfoResponse {
@@ -160,22 +150,23 @@ class ProductSearchRepository @Inject constructor(
         }
     }
 
-    private suspend fun searchLocationProductsFromDatabase(locationId: String): List<LocationProduct> {
+//    private suspend fun searchLocationProductsFromDatabase(locationId: String): List<LocationProduct> {
         // Query from the database by locationId
-        val storageItems = dao.findItemsByShk(locationId)
-        return storageItems.map { storageItemEntity ->
-            LocationProduct(
-                id = storageItemEntity.id,
-                locationId = storageItemEntity.wrShk, // Example, adjust if needed
-                quantity = storageItemEntity.placeQnt,
-                conditionState = storageItemEntity.conditionState,
-                expirationDate = storageItemEntity.expirationDate,
-                shk = storageItemEntity.shk,
-                name = storageItemEntity.name,
-                article = storageItemEntity.article
-            )
-        }
-    }
+//        val storageItems = dao.findItemsByShk(locationId)
+//        return storageItems.map { storageItemEntity ->
+//            LocationProduct(
+//                id = storageItemEntity.id,
+//                locationId = storageItemEntity.wrShk, // Example, adjust if needed
+//                quantity = storageItemEntity.placeQnt,
+//                conditionState = storageItemEntity.conditionState,
+//                expirationDate = storageItemEntity.expirationDate,
+//                shk = storageItemEntity.shk,
+//                name = storageItemEntity.name,
+//                article = storageItemEntity.article,
+//                productQnt = storageItemEntity.productQnt
+//            )
+//        }
+//    }
 
     private suspend fun searchProductInfoFromDatabase(query: String): ProductInfo {
         // Query from the database by article or barcode
@@ -204,7 +195,8 @@ class ProductSearchRepository @Inject constructor(
                     name_wr = storageItemEntity.wrShk,
                     quantity = storageItemEntity.placeQnt,
                     conditionState = storageItemEntity.conditionState,
-                    expirationDate = storageItemEntity.expirationDate
+                    expirationDate = storageItemEntity.expirationDate,
+                    productQnt = storageItemEntity.productQnt
                 )
             }
         )

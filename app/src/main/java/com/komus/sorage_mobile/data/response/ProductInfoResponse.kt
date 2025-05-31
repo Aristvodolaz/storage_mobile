@@ -21,6 +21,7 @@ data class ProductLocation(
     @SerializedName("id") val id: Int,
     @SerializedName("name_wr_shk") val name_wr: String,
     @SerializedName("placeQnt") val quantity: Int,
+    @SerializedName("productQnt") val productQnt: Int,
     @SerializedName("conditionState") val conditionState: String?,
     @SerializedName("expirationDate") val expirationDate: String?
 ) 

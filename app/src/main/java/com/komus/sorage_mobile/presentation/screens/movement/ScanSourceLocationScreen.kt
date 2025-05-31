@@ -25,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -227,6 +228,7 @@ fun ScanSourceLocationScreen(
     // Диалог ввода срока годности и состояния
     if (showExpirationAndConditionDialog && selectedItem != null) {
         ExpirationAndConditionDialog(
+            item = selectedItem!!,
             onConfirm = { expirationDate, condition, reason ->
                 movementViewModel.selectItem(selectedItem!!)
                 movementViewModel.setMoveQuantity(moveQuantity)
@@ -332,61 +334,84 @@ fun ScanSourceLocationScreen(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun ExpirationAndConditionDialog(
+    item: LocationItem,
     onConfirm: (String, String, String?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var expirationDate by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf("") }
     var months by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("") }
+    var finalDate by remember { mutableStateOf("") }
     var condition by remember { mutableStateOf("Кондиция") }
     var reason by remember { mutableStateOf("") }
     var showReasonError by remember { mutableStateOf(false) }
     var showExpirationAlert by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
+    var skipExpirationDate by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    // Функция для расчета конечной даты
-    fun calculateFinalDate(): String {
-        if (expirationDate.isEmpty()) return ""
-        
-        try {
-            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-            val baseDate = LocalDate.parse(expirationDate, formatter)
-            var finalDate = baseDate
+    // Функция для проверки корректности даты
+    fun isValidDate(dateStr: String): Boolean {
+        return try {
+            val parts = dateStr.split(".")
+            if (parts.size != 3) return false
             
-            // Сначала добавляем месяцы
-            if (months.isNotEmpty()) {
-                val monthsToAdd = months.toIntOrNull() ?: 0
-                if (monthsToAdd > 0) {
-                    finalDate = finalDate.plusMonths(monthsToAdd.toLong())
-                }
-            }
+            val day = parts[0].toInt()
+            val month = parts[1].toInt()
+            val year = parts[2].toInt()
             
-            // Затем добавляем дни
-            if (days.isNotEmpty()) {
-                val daysToAdd = days.toIntOrNull() ?: 0
-                if (daysToAdd > 0) {
-                    finalDate = finalDate.plusDays(daysToAdd.toLong())
-                }
-            }
+            if (day < 1 || day > 31) return false
+            if (month < 1 || month > 12) return false
+            if (year < 2000 || year > 2100) return false
             
-            return finalDate.format(formatter)
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Ошибка при расчете даты: ${e.message}")
-            return expirationDate
+            false
         }
     }
 
     // Функция для проверки срока годности
-    fun checkExpirationDate(date: String): Boolean {
+    fun checkExpirationDate(dateStr: String): Boolean {
         try {
             val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-            val parsedDate = LocalDate.parse(date, formatter)
-            val isoDate = parsedDate.format(DateTimeFormatter.ISO_DATE)
+            val date = LocalDate.parse(dateStr, formatter)
+            val isoDate = date.format(DateTimeFormatter.ISO_DATE)
             return ExpirationDateValidator.isExpired(isoDate)
         } catch (e: Exception) {
             Log.e(TAG, "Ошибка при проверке срока годности: ${e.message}")
             return false
+        }
+    }
+
+    // Функция для расчета конечной даты
+    fun calculateFinalDate() {
+        if (skipExpirationDate || !isValidDate(startDate)) return
+        
+        try {
+            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            val baseDate = LocalDate.parse(startDate, formatter)
+            var calculatedDate = baseDate
+            
+            val monthsToAdd = months.toIntOrNull() ?: 0
+            val daysToAdd = days.toIntOrNull() ?: 0
+            
+            if (monthsToAdd > 0) {
+                calculatedDate = calculatedDate.plusMonths(monthsToAdd.toLong())
+            }
+            
+            if (daysToAdd > 0) {
+                calculatedDate = calculatedDate.plusDays(daysToAdd.toLong())
+            }
+            
+            finalDate = calculatedDate.format(formatter)
+            
+            // Проверяем срок годности по итоговой дате
+            if (checkExpirationDate(finalDate) && condition == "Кондиция") {
+                showExpirationAlert = true
+                condition = "Некондиция"
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Ошибка при расчете даты: ${e.message}")
         }
     }
 
@@ -406,15 +431,9 @@ fun ExpirationAndConditionDialog(
                 Button(
                     onClick = { 
                         showExpirationAlert = false
-                        condition = "Некондиция"
                     }
                 ) {
-                    Text("Установить 'Некондиция'")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExpirationAlert = false }) {
-                    Text("Отмена")
+                    Text("ОК")
                 }
             },
             backgroundColor = Color.White,
@@ -437,82 +456,130 @@ fun ExpirationAndConditionDialog(
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
             ) {
-                OutlinedTextField(
-                    value = expirationDate,
-                    onValueChange = { 
-                        expirationDate = it
-                        // Проверяем срок годности при вводе
-                        if (it.isNotEmpty()) {
-                            val finalDate = calculateFinalDate()
-                            if (checkExpirationDate(finalDate) && condition == "Кондиция") {
-                                showExpirationAlert = true
-                            }
+                if (!skipExpirationDate) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = startDate,
+                            onValueChange = { 
+                                startDate = it
+                                if (isValidDate(it)) {
+                                    calculateFinalDate()
+                                }
+                            },
+                            label = { Text("Дата начала срока годности (ДД.ММ.ГГГГ)", fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                // Устанавливаем дату 01.01.2999 и очищаем поля
+                                startDate = ""
+                                days = ""
+                                months = ""
+                                finalDate = "01.01.2999"
+                                skipExpirationDate = true
+                            },
+                            modifier = Modifier.height(56.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = Color(0xFF2196F3),
+                                contentColor = Color.White
+                            )
+                        ) {
+                            Text(
+                                "Пропустить СГ",
+                                fontSize = 9.sp,
+                                textAlign = TextAlign.Center
+                            )
                         }
-                    },
-                    label = { Text("Срок годности (ДД.ММ.ГГГГ)", fontSize = 12.sp) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = months,
+                            onValueChange = { 
+                                if (it.all { char -> char.isDigit() }) {
+                                    months = it
+                                    if (isValidDate(startDate)) {
+                                        calculateFinalDate()
+                                    }
+                                }
+                            },
+                            label = { Text("Месяцы", fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        OutlinedTextField(
+                            value = days,
+                            onValueChange = { 
+                                if (it.all { char -> char.isDigit() }) {
+                                    days = it
+                                    if (isValidDate(startDate)) {
+                                        calculateFinalDate()
+                                    }
+                                }
+                            },
+                            label = { Text("Дни", fontSize = 12.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    if (finalDate.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Итоговая дата: $finalDate",
+                            color = MaterialTheme.colors.primary,
+                            fontSize = 12.sp
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Срок годности: 01.01.2999 (пропущен)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2196F3)
+                    )
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Button(
+                        onClick = {
+                            skipExpirationDate = false
+                            finalDate = ""
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color.Gray,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Ввести дату вручную", fontSize = 10.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Состояние товара:",
+                    fontSize = 12.sp
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = months,
-                        onValueChange = { 
-                            if (it.all { char -> char.isDigit() }) {
-                                months = it
-                                // Пересчитываем итоговую дату при изменении месяцев
-                                if (expirationDate.isNotEmpty()) {
-                                    val finalDate = calculateFinalDate()
-                                    if (checkExpirationDate(finalDate) && condition == "Кондиция") {
-                                        showExpirationAlert = true
-                                    }
-                                }
-                            }
-                        },
-                        label = { Text("Месяцы", fontSize = 12.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-
-                    OutlinedTextField(
-                        value = days,
-                        onValueChange = { 
-                            if (it.all { char -> char.isDigit() }) {
-                                days = it
-                                // Пересчитываем итоговую дату при изменении дней
-                                if (expirationDate.isNotEmpty()) {
-                                    val finalDate = calculateFinalDate()
-                                    if (checkExpirationDate(finalDate) && condition == "Кондиция") {
-                                        showExpirationAlert = true
-                                    }
-                                }
-                            }
-                        },
-                        label = { Text("Дни", fontSize = 12.sp) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                if (expirationDate.isNotEmpty() && (months.isNotEmpty() || days.isNotEmpty())) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Итоговая дата: ${calculateFinalDate()}",
-                        color = MaterialTheme.colors.primary,
-                        fontSize = 12.sp
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -521,17 +588,11 @@ fun ExpirationAndConditionDialog(
                         RadioButton(
                             selected = condition == "Кондиция",
                             onClick = { 
-                                // Проверяем срок годности при смене состояния
-                                if (expirationDate.isNotEmpty()) {
-                                    try {
-                                        val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                        val isoDate = date.format(DateTimeFormatter.ISO_DATE)
-                                        if (ExpirationDateValidator.isExpired(isoDate)) {
+                                // Проверяем по итоговой дате, если она есть
+                                if (finalDate.isNotEmpty()) {
+                                    if (checkExpirationDate(finalDate)) {
                                             showExpirationAlert = true
                                             return@RadioButton
-                                        }
-                                    } catch (e: Exception) {
-                                        // Игнорируем ошибки парсинга
                                     }
                                 }
                                 condition = "Кондиция"
@@ -548,7 +609,10 @@ fun ExpirationAndConditionDialog(
                     ) {
                         RadioButton(
                             selected = condition == "Некондиция",
-                            onClick = { condition = "Некондиция" }
+                            onClick = { 
+                                condition = "Некондиция"
+                                showReasonError = reason.isEmpty()
+                            }
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("Некондиция", fontSize = 14.sp)
@@ -556,7 +620,7 @@ fun ExpirationAndConditionDialog(
                 }
 
                 if (condition == "Некондиция") {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     ExposedDropdownMenuBox(
                         expanded = expanded,
@@ -598,15 +662,7 @@ fun ExpirationAndConditionDialog(
                                         reason = reasonOption
                                         expanded = false
                                         showReasonError = false
-                                    },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            if (reason == reasonOption) 
-                                                MaterialTheme.colors.primary.copy(alpha = 0.1f) 
-                                            else 
-                                                MaterialTheme.colors.surface
-                                        )
+                                    }
                                 ) {
                                     Text(
                                         text = reasonOption,
@@ -641,30 +697,33 @@ fun ExpirationAndConditionDialog(
                         return@Button
                     }
 
-                    // Проверяем срок годности перед сохранением
-                    if (expirationDate.isNotEmpty()) {
-                        try {
-                            val date = LocalDate.parse(expirationDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                            val isoDate = date.format(DateTimeFormatter.ISO_DATE)
-                            if (ExpirationDateValidator.isExpired(isoDate) && condition == "Кондиция") {
-                                showExpirationAlert = true
-                                return@Button
-                            }
-                        } catch (e: Exception) {
-                            // Игнорируем ошибки парсинга
+                    val dateToUse = if (skipExpirationDate) "01.01.2999" else (if (finalDate.isNotEmpty()) finalDate else startDate)
+                    if (dateToUse.isEmpty()) {
+                        return@Button
+                    }
+
+                    try {
+                        val isoDate = if (skipExpirationDate) {
+                            "2999-01-01"
+                        } else {
+                            val formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+                            val date = LocalDate.parse(dateToUse, formatter)
+                            date.format(DateTimeFormatter.ISO_DATE)
                         }
+                        
+                        // Финальная проверка по итоговой дате только если не пропущен срок годности
+                        if (!skipExpirationDate && checkExpirationDate(dateToUse) && condition == "Кондиция") {
+                            showExpirationAlert = true
+                            return@Button
+                        }
+                        
+                        onConfirm(isoDate, condition, if (condition == "Некондиция") reason else null)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Ошибка при сохранении даты: ${e.message}")
                     }
-
-                    // Используем итоговую дату, если были введены месяцы или дни
-                    val finalDate = if (months.isNotEmpty() || days.isNotEmpty()) {
-                        calculateFinalDate()
-                    } else {
-                        expirationDate
-                    }
-
-                    onConfirm(finalDate, condition, if (condition == "Некондиция") reason else null)
                 },
-                enabled = expirationDate.isNotEmpty() && (condition != "Некондиция" || reason.isNotEmpty())
+                enabled = (skipExpirationDate || startDate.isNotEmpty() || finalDate.isNotEmpty()) && 
+                         (condition != "Некондиция" || reason.isNotEmpty())
             ) {
                 Text("ОК", fontSize = 14.sp)
             }

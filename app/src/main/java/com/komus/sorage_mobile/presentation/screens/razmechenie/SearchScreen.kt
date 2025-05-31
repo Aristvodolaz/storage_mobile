@@ -160,7 +160,7 @@ fun SearchScreen(
                     Button(
                         onClick = {
                             if (query.isNotEmpty()) {
-                                val isShk = query.length > 7
+                                val isShk = query.length > 10
                                 navigating = false
                                 searchViewModel.search(shk = if (isShk) query else null, article = if (!isShk) query else null)
                             }
@@ -394,8 +394,10 @@ private fun saveProductData(spHelper: SPHelper, item: SearchItem) {
     // Сохраняем артикул
     spHelper.saveArticle(item.ARTICLE_ID_REAL)
     
-    // Сохраняем штрихкод
-    spHelper.saveShk(item.SHK)
+    // Сохраняем штрихкод только если он не null
+    item.SHK?.let { shk ->
+        spHelper.saveShk(shk)
+    } ?: spHelper.saveShk("")  // If SHK is null, save empty string
     
     // Сохраняем название товара
     spHelper.saveProductName(item.NAME)

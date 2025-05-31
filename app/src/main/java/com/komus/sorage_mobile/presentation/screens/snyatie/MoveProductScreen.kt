@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -546,18 +547,68 @@ fun MoveProductScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             var expirationDate by remember { mutableStateOf("2025-01-14") }
+                            var skipExpirationDate by remember { mutableStateOf(false) }
                             
-                            OutlinedTextField(
-                                value = expirationDate,
-                                onValueChange = { expirationDate = it },
-                                label = { Text("Срок годности (ГГГГ-ММ-ДД)") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    focusedBorderColor = MaterialTheme.colors.primary,
-                                    unfocusedBorderColor = MaterialTheme.colors.primary.copy(alpha = 0.5f)
+                            if (!skipExpirationDate) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    OutlinedTextField(
+                                        value = expirationDate,
+                                        onValueChange = { expirationDate = it },
+                                        label = { Text("Срок годности (ГГГГ-ММ-ДД)") },
+                                        modifier = Modifier.weight(1f),
+                                        singleLine = true,
+                                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                                            focusedBorderColor = MaterialTheme.colors.primary,
+                                            unfocusedBorderColor = MaterialTheme.colors.primary.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    
+                                    Button(
+                                        onClick = {
+                                            expirationDate = "2999-01-01"
+                                            skipExpirationDate = true
+                                        },
+                                        modifier = Modifier.height(56.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            backgroundColor = Color(0xFF2196F3),
+                                            contentColor = Color.White
+                                        )
+                                    ) {
+                                        Text(
+                                            "Пропустить СГ",
+                                            fontSize = 9.sp,
+                                            textAlign = TextAlign.Center
+                                        )
+                                    }
+                                }
+                            } else {
+                                Text(
+                                    text = "Срок годности: 2999-01-01 (пропущен)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2196F3)
                                 )
-                            )
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        skipExpirationDate = false
+                                        expirationDate = "2025-01-14"
+                                    },
+                                    colors = ButtonDefaults.buttonColors(
+                                        backgroundColor = Color.Gray,
+                                        contentColor = Color.White
+                                    )
+                                ) {
+                                    Text("Ввести дату вручную", fontSize = 10.sp)
+                                }
+                            }
                             
                             Spacer(modifier = Modifier.height(8.dp))
                             
