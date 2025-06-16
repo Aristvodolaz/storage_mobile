@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 fun WarehouseSelector(
     currentWarehouse: String,
     onWarehouseSelected: (String) -> Unit,
-    warehouses: List<String> = listOf("85", "86", "87") // Список доступных складов
+    warehouses: List<String> = listOf("1383", "85") // Список доступных складов
 ) {
     var expanded by remember { mutableStateOf(false) }
 

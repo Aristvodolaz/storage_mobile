@@ -40,9 +40,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.components.TopConnectionStatusBar
-import com.komus.sorage_mobile.presentation.screens.razmechenie.OfflinePlacementScreen
-import com.komus.sorage_mobile.presentation.screens.razmechenie.PlacementRouterScreen
-import com.komus.sorage_mobile.ui.navigation.NavRoutes
 import com.komus.sorage_mobile.util.NetworkUtils
 import kotlinx.coroutines.flow.collectLatest
 
@@ -159,6 +156,7 @@ fun NavigationGraph(
 
 
             composable("auth") {
+              //  SearchScreen(navController,scannerViewModel, spHelper = spHelper){}
                 AuthScreen(navController = navController, scannerViewModel) // Display AuthScreen first
             }
             composable(Screen.Inventory.route) {
@@ -166,8 +164,7 @@ fun NavigationGraph(
             }
 
             composable(Screen.Placement.route) {
-                if(isOnline) SearchScreen(navController,scannerViewModel, spHelper = spHelper){}
-                else  OfflinePlacementScreen(navController)
+                 SearchScreen(navController,scannerViewModel, spHelper = spHelper){}
             }
 
 

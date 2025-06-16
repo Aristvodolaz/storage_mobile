@@ -121,7 +121,7 @@ interface StorageApi {
     suspend fun getAllStorageItems(
         @Query("limit") limit: Int = 1000,
         @Query("offset") offset: Int = 0,
-        @Query("id_sklad") warehouseId: Int = 85
+        @Query("id_sklad") warehouseId: Int = 1383
     ): StorageResponse
 
     @GET("/api/storage/empty-cells")

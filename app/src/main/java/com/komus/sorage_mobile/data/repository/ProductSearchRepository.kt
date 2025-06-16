@@ -32,7 +32,7 @@ class ProductSearchRepository @Inject constructor(
             val isShk = query.length > 7
             Log.d("ProductSearchRepository", "Поиск товаров: ${if (isShk) "ШК=$query" else "Артикул=$query"}")
 
-            if (networkUtils.isNetworkAvailable()) {
+//            if (networkUtils.isNetworkAvailable()) {
                 // Если есть интернет, ищем через API
                 val apiResponse = withContext(Dispatchers.IO) {
                     api.getProductDetails(
@@ -45,12 +45,12 @@ class ProductSearchRepository @Inject constructor(
                 } else {
                     emit(Result.failure(Exception("Ошибка поиска товаров")))
                 }
-            } else {
-                // Если нет интернета, ищем в базе данных
-                Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных")
-                val localData = searchProductsFromDatabase(query)
-                emit(Result.success(localData)) // Emit local data if no internet
-            }
+//            } else {
+//                // Если нет интернета, ищем в базе данных
+//                Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных")
+//                val localData = searchProductsFromDatabase(query)
+//                emit(Result.success(localData)) // Emit local data if no internet
+//            }
 
         } catch (e: Exception) {
             Log.e("ProductSearchRepository", "Исключение при поиске товаров: ${e.message}")
@@ -59,7 +59,7 @@ class ProductSearchRepository @Inject constructor(
     }
 
     suspend fun getEmptyCells(skladId: Int): List<String> {
-        return if (networkUtils.isNetworkAvailable()) {
+        return if (true) {
             val response = api.getEmptyCells(skladId)
             if (response.success) {
                 response.data.cells.map { it.name }
@@ -123,31 +123,14 @@ class ProductSearchRepository @Inject constructor(
     suspend fun searchProductsByArticle(article: String): ProductInfoResponse {
         val skladId = spHelper.getSkladId()
 
-        return if (networkUtils.isNetworkAvailable()) {
-            // If network is available, make the API request
-            api.getProductInfo(article = article, skladId = skladId.toInt())
-        } else {
-            // If no network, query from the local database
-            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по article")
-            val localData = searchProductInfoFromDatabase(article)
-            // Assuming you want to return a response in the same format as the API response
-            ProductInfoResponse(success = true, data = localData, message = null)
-        }
+        return api.getProductInfo(article = article, skladId = skladId.toInt())
     }
 
     suspend fun searchProductsByBarcode(barcode: String): ProductInfoResponse {
         val skladId = spHelper.getSkladId()
 
-        return if (networkUtils.isNetworkAvailable()) {
-            // If network is available, make the API request
-            api.getProductInfo(shk = barcode, skladId = skladId.toInt())
-        } else {
-            // If no network, query from the local database
-            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по barcode")
-            val localData = searchProductInfoFromDatabase(barcode)
-            // Assuming you want to return a response in the same format as the API response
-            ProductInfoResponse(success = true, data = localData, message = null)
-        }
+        return api.getProductInfo(shk = barcode, skladId = skladId.toInt())
+
     }
 
 //    private suspend fun searchLocationProductsFromDatabase(locationId: String): List<LocationProduct> {

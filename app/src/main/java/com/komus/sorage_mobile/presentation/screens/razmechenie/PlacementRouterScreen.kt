@@ -22,14 +22,14 @@ fun PlacementRouterScreen(
         }
     }
     LaunchedEffect(isOnline) {
-        if (isOnline) {
+//        if (isOnline) {
             navController.navigate(NavRoutes.ONLINE_PLACEMENT) {
                 popUpTo(NavRoutes.PLACEMENT_ROUTER) { inclusive = true }
             }
-        } else {
-            navController.navigate(NavRoutes.OFFLINE_PLACEMENT) {  // Make sure the correct route is used
-                popUpTo(NavRoutes.PLACEMENT_ROUTER) { inclusive = true }
-            }
-        }
+//        } else {
+//            navController.navigate(NavRoutes.OFFLINE_PLACEMENT) {  // Make sure the correct route is used
+//                popUpTo(NavRoutes.PLACEMENT_ROUTER) { inclusive = true }
+//            }
+//        }
     }
 } 

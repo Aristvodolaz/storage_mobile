@@ -461,7 +461,7 @@ fun ScanBufferLocationScreen(
             // Сохраняем ячейку буфера
             spHelper.saveBufferLocation(locationId)
             spHelper.saveWrShk(locationId)
-            spHelper.saveSkladId("85")
+            spHelper.saveSkladId("1383")
 
             val productId = spHelper.getProductId()
             val brief = spHelper.getBrief()

@@ -22,10 +22,10 @@ class StorageRepository @Inject constructor(
     }
 
     suspend fun syncStorageItems() {
-        if (!networkUtils.isNetworkAvailable()) {
-            Log.d(TAG, "Нет подключения к интернету для синхронизации storage items")
-            return
-        }
+//        if (!networkUtils.isNetworkAvailable()) {
+//            Log.d(TAG, "Нет подключения к интернету для синхронизации storage items")
+//            return
+//        }
 
         try {
             Log.d(TAG, "Начало синхронизации storage items")
@@ -97,7 +97,7 @@ class StorageRepository @Inject constructor(
             Log.d(TAG, "Найдено ${localItems.size} товаров локально")
 
             // Если есть сеть, пытаемся найти на сервере
-            if (networkUtils.isNetworkAvailable()) {
+            if (true) {
                 try {
                     val response = api.searchProductByArticleOrBarcode(query)
 

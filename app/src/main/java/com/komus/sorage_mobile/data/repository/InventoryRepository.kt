@@ -30,7 +30,7 @@ class InventoryRepository @Inject constructor(
      * Получение списка товаров по ID ячейки
      */
     suspend fun getItemsByLocationId(locationId: String): List<InventoryItem> {
-        return if (networkUtils.isNetworkAvailable()) {
+        return if (true) {
             try {
                 // Пытаемся получить данные с сервера
                 val skladId = spHelper.getSkladId()
@@ -92,7 +92,7 @@ class InventoryRepository @Inject constructor(
      * Получение списка товаров по артикулу
      */
     suspend fun getIgetItemsByArticletemsBySku(sku: String): List<InventoryItem> {
-        return if (networkUtils.isNetworkAvailable()) {
+        return if (true) {
             try {
                 val skladId = spHelper.getSkladId()
                 val response = api.getInventoryItemByArticle(sku, skladId)
@@ -152,7 +152,7 @@ class InventoryRepository @Inject constructor(
         dao.insertItem(inventoryEntity)
 
         // Если есть сеть, пытаемся синхронизировать
-        if (networkUtils.isNetworkAvailable()) {
+        if (true) {
             try {
                 val request = InventoryRequest(
                     id = item.id,
@@ -201,7 +201,7 @@ class InventoryRepository @Inject constructor(
         dao.insertItem(inventoryEntity)
 
         // Если есть сеть, пытаемся синхронизировать
-        if (networkUtils.isNetworkAvailable()) {
+        if (true) {
             try {
                 val request = InventoryRequest(
                     id = item.id,
@@ -230,7 +230,7 @@ class InventoryRepository @Inject constructor(
      * Синхронизация несинхронизированных данных
      */
     suspend fun syncUnsyncedItems() {
-        if (!networkUtils.isNetworkAvailable()) return
+//        if (!networkUtils.isNetworkAvailable()) return
 
         val unsyncedItems = dao.getUnsyncedItems()
         val userName = spHelper.getUserName()
@@ -279,10 +279,10 @@ class InventoryRepository @Inject constructor(
 
 
     suspend fun syncInventory() {
-        if (!networkUtils.isNetworkAvailable()) {
-            Log.d(TAG, "Network is not available, skipping sync")
-            return
-        }
+//        if (!networkUtils.isNetworkAvailable()) {
+//            Log.d(TAG, "Network is not available, skipping sync")
+//            return
+//        }
 
         try {
             Log.d(TAG, "Starting inventory sync")
@@ -321,11 +321,11 @@ class InventoryRepository @Inject constructor(
     }
 
     suspend fun syncPendingInventory() {
-        if (!networkUtils.isNetworkAvailable()) {
-            Log.d("InventoryRepository", "Нет подключения к интернету для синхронизации инвентаризации")
-            return
-        }
-        
+//        if (!networkUtils.isNetworkAvailable()) {
+//            Log.d("InventoryRepository", "Нет подключения к интернету для синхронизации инвентаризации")
+//            return
+//        }
+//
         try {
             // Получаем несинхронизированные данные инвентаризации
             val unsyncedInventory = dao.getUnsyncedInventoryItems()

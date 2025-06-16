@@ -163,7 +163,7 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
     }
 
     fun getSkladId(): String {
-        return sharedPreferences.getString("skladId", "85") ?: "85"
+        return sharedPreferences.getString("skladId", "1383") ?: "1383"
     }
 
     // Методы для работы с причиной некондиции

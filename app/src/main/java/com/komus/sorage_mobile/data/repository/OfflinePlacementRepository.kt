@@ -44,9 +44,9 @@ class OfflinePlacementRepository @Inject constructor(
             Log.d("OfflinePlacementRepo", "Placement saved successfully: ${placement.id}")
             
             // Попытка синхронизации сразу после сохранения, если есть интернет
-            if (networkUtils.isNetworkAvailable()) {
+//            if (networkUtils.isNetworkAvailable()) {
                 syncPlacement(placement)
-            }
+//            }
         } catch (e: Exception) {
             Log.e("OfflinePlacementRepo", "Error saving placement", e)
             throw e
@@ -123,10 +123,10 @@ class OfflinePlacementRepository @Inject constructor(
     }
 
     suspend fun syncPendingPlacements() {
-        if (!networkUtils.isNetworkAvailable()) {
-            Log.d("OfflinePlacementRepo", "No network connection available for sync")
-            return
-        }
+//        if (!networkUtils.isNetworkAvailable()) {
+//            Log.d("OfflinePlacementRepo", "No network connection available for sync")
+//            return
+//        }
 
         val placementsToSync = offlinePlacementDao.getPlacementsForSync(System.currentTimeMillis())
         for (placement in placementsToSync) {

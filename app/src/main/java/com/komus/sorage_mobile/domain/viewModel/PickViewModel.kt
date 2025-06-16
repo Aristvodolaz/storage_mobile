@@ -97,7 +97,7 @@ class PickViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                val skladId = if (_skladId.isNotEmpty()) _skladId else "85" // Используем значение по умолчанию, если не задано
+                val skladId = if (_skladId.isNotEmpty()) _skladId else "1383" // Используем значение по умолчанию, если не задано
 
                 
                 val response = item.wrShk?.let {
