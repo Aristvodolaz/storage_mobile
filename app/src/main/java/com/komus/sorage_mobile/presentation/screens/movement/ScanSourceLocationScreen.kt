@@ -24,6 +24,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -74,14 +76,21 @@ fun ScanSourceLocationScreen(
     // Новое состояние для успешного диалога
     var showSuccessDialog by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf("") }
+    val locationFocusRequester = remember { FocusRequester() }
 
     // Обновление данных при возврате на экран
     LaunchedEffect(Unit) {
         if (locationId.isNotEmpty()) {
             movementViewModel.getLocationItems(locationId)
         }
+        }
+    
+    // Автофокус на поле ячейки при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        locationFocusRequester.requestFocus()
     }
-
+    
     // Обработка состояния перемещения
     LaunchedEffect(moveProductState) {
         when (moveProductState) {
@@ -150,7 +159,9 @@ fun ScanSourceLocationScreen(
                 value = locationId,
                 onValueChange = { locationId = it },
                 label = { Text("ID ячейки", fontSize = 12.sp) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .focusRequester(locationFocusRequester),
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Поиск", modifier = Modifier.size(16.dp)) },
                 trailingIcon = {
@@ -342,11 +353,7 @@ fun ExpirationAndConditionDialog(
     var months by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("") }
     var finalDate by remember { mutableStateOf("") }
-    var condition by remember { mutableStateOf("Кондиция") }
-    var reason by remember { mutableStateOf("") }
-    var showReasonError by remember { mutableStateOf(false) }
-    var showExpirationAlert by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
+
     var skipExpirationDate by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
@@ -404,42 +411,12 @@ fun ExpirationAndConditionDialog(
             }
             
             finalDate = calculatedDate.format(formatter)
-            
-            // Проверяем срок годности по итоговой дате
-            if (checkExpirationDate(finalDate) && condition == "Кондиция") {
-                showExpirationAlert = true
-                condition = "Некондиция"
-            }
         } catch (e: Exception) {
             Log.e(TAG, "Ошибка при расчете даты: ${e.message}")
         }
     }
 
-    // Диалог предупреждения о сроке годности
-    if (showExpirationAlert) {
-        AlertDialog(
-            onDismissRequest = { showExpirationAlert = false },
-            title = { Text("Внимание!") },
-            text = { 
-                Column {
-                    Text("Срок годности товара истек.")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showExpirationAlert = false
-                    }
-                ) {
-                    Text("ОК")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
-    }
+
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -571,132 +548,16 @@ fun ExpirationAndConditionDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = "Состояние товара:",
-                    fontSize = 12.sp
+                    text = "Состояние товара: Кондиция",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colors.primary
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        RadioButton(
-                            selected = condition == "Кондиция",
-                            onClick = { 
-                                // Проверяем по итоговой дате, если она есть
-                                if (finalDate.isNotEmpty()) {
-                                    if (checkExpirationDate(finalDate)) {
-                                            showExpirationAlert = true
-                                            return@RadioButton
-                                    }
-                                }
-                                condition = "Кондиция"
-                                showReasonError = false
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Кондиция", fontSize = 14.sp)
-                    }
-                    
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        RadioButton(
-                            selected = condition == "Некондиция",
-                            onClick = { 
-                                condition = "Некондиция"
-                                showReasonError = reason.isEmpty()
-                            }
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Некондиция", fontSize = 14.sp)
-                    }
-                }
-
-                if (condition == "Некондиция") {
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    ExposedDropdownMenuBox(
-                        expanded = expanded,
-                        onExpandedChange = { expanded = !expanded },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        OutlinedTextField(
-                            value = reason,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { 
-                                Text(
-                                    if (reason.isEmpty()) "Выберите причину некондиции" else "Причина некондиции",
-                                    fontSize = 12.sp
-                                ) 
-                            },
-                            trailingIcon = {
-                                Icon(
-                                    if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                                    "Развернуть",
-                                    Modifier.size(16.dp)
-                                )
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                            isError = showReasonError && reason.isEmpty()
-                        )
-                        
-                        ExposedDropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false },
-                            modifier = Modifier
-                                .background(MaterialTheme.colors.surface)
-                                .heightIn(max = 200.dp)
-                        ) {
-                            ConditionReasons.reasons.forEach { reasonOption ->
-                                DropdownMenuItem(
-                                    onClick = {
-                                        reason = reasonOption
-                                        expanded = false
-                                        showReasonError = false
-                                    }
-                                ) {
-                                    Text(
-                                        text = reasonOption,
-                                        fontSize = 12.sp,
-                                        color = if (reason == reasonOption) 
-                                            MaterialTheme.colors.primary 
-                                        else 
-                                            MaterialTheme.colors.onSurface
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (showReasonError && reason.isEmpty()) {
-                        Text(
-                            text = "Выберите причину некондиции",
-                            color = MaterialTheme.colors.error,
-                            style = MaterialTheme.typography.caption,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                        )
-                    }
-                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    if (condition == "Некондиция" && reason.isEmpty()) {
-                        showReasonError = true
-                        return@Button
-                    }
-
                     val dateToUse = if (skipExpirationDate) "01.01.2999" else (if (finalDate.isNotEmpty()) finalDate else startDate)
                     if (dateToUse.isEmpty()) {
                         return@Button
@@ -711,19 +572,13 @@ fun ExpirationAndConditionDialog(
                             date.format(DateTimeFormatter.ISO_DATE)
                         }
                         
-                        // Финальная проверка по итоговой дате только если не пропущен срок годности
-                        if (!skipExpirationDate && checkExpirationDate(dateToUse) && condition == "Кондиция") {
-                            showExpirationAlert = true
-                            return@Button
-                        }
-                        
-                        onConfirm(isoDate, condition, if (condition == "Некондиция") reason else null)
+                        // Автоматически используем состояние "Кондиция"
+                        onConfirm(isoDate, "Кондиция", null)
                     } catch (e: Exception) {
                         Log.e(TAG, "Ошибка при сохранении даты: ${e.message}")
                     }
                 },
-                enabled = (skipExpirationDate || startDate.isNotEmpty() || finalDate.isNotEmpty()) && 
-                         (condition != "Некондиция" || reason.isNotEmpty())
+                enabled = skipExpirationDate || startDate.isNotEmpty() || finalDate.isNotEmpty()
             ) {
                 Text("ОК", fontSize = 14.sp)
             }
@@ -748,6 +603,13 @@ fun CompactQuantityDialog(
     val productQnt = item.units.firstOrNull()?.productQnt?.toIntOrNull() ?: 1
     val availableExQuantity = availableQuantity / productQnt
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val quantityFocusRequester = remember { FocusRequester() }
+    
+    // Автофокус на поле количества при открытии диалога
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        quantityFocusRequester.requestFocus()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -793,7 +655,9 @@ fun CompactQuantityDialog(
                     textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
                     singleLine = true,
                     isError = errorMessage != null,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(quantityFocusRequester)
                 )
                 
                 if (errorMessage != null) {
@@ -841,6 +705,13 @@ fun CompactTargetLocationDialog(
 ) {
     var locationId by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    val targetLocationFocusRequester = remember { FocusRequester() }
+    
+    // Автофокус на поле целевой ячейки при открытии диалога
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        targetLocationFocusRequester.requestFocus()
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -867,7 +738,9 @@ fun CompactTargetLocationDialog(
                         textStyle = LocalTextStyle.current.copy(fontSize = 14.sp),
                         singleLine = true,
                         isError = errorMessage != null,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(targetLocationFocusRequester)
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))

@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -43,13 +45,12 @@ fun ExpirationDateScreen(
     var days by remember { mutableStateOf("") }
     var months by remember { mutableStateOf("") }
     var endDate by remember { mutableStateOf("") }
-    var condition by remember { mutableStateOf("Кондиция") }
-    var reason by remember { mutableStateOf("") }
-    var showReasonError by remember { mutableStateOf(false) }
-    var expanded by remember { mutableStateOf(false) }
-    var showExpirationAlert by remember { mutableStateOf(false) }
+
     var skipExpirationDate by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val startDateFocusRequester = remember { FocusRequester() }
+    val daysFocusRequester = remember { FocusRequester() }
+    val monthsFocusRequester = remember { FocusRequester() }
 
     // Автоматический расчет конечной даты
     LaunchedEffect(startDate, days, months) {
@@ -57,38 +58,16 @@ fun ExpirationDateScreen(
             endDate = viewModel.calculateEndDate(startDate, days, months)
         }
     }
-
-    // Диалог предупреждения о сроке годности
-    if (showExpirationAlert) {
-        AlertDialog(
-            onDismissRequest = { showExpirationAlert = false },
-            title = { Text("Внимание!") },
-            text = { 
-                Column {
-                    Text("Срок годности товара истек.")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text("Для товара с истекшим сроком годности можно установить только состояние 'Некондиция'.")
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        condition = "Некондиция"
-                        showExpirationAlert = false
-                    }
-                ) {
-                    Text("Установить 'Некондиция'")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showExpirationAlert = false }) {
-                    Text("Отмена")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
+    
+    // Автофокус на поле даты при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        if (!skipExpirationDate) {
+            startDateFocusRequester.requestFocus()
+        }
     }
+
+
 
     Scaffold(
         topBar = {
@@ -149,7 +128,9 @@ fun ExpirationDateScreen(
                                     ) 
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(startDateFocusRequester),
                                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                 singleLine = true,
                                 trailingIcon = {
@@ -248,7 +229,9 @@ fun ExpirationDateScreen(
                                     ) 
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(daysFocusRequester),
                                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                 singleLine = true
                             )
@@ -270,7 +253,9 @@ fun ExpirationDateScreen(
                                     ) 
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .focusRequester(monthsFocusRequester),
                                 textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                 singleLine = true
                             )
@@ -324,194 +309,36 @@ fun ExpirationDateScreen(
                 }
             }
             
-            // Карточка выбора состояния товара
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                elevation = 2.dp,
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(8.dp)
-                ) {
-                    Text(
-                        text = "Состояние товара",
-                        style = MaterialTheme.typography.caption,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // Радио-кнопки для выбора состояния
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp)
-                        ) {
-                            RadioButton(
-                                selected = condition == "Кондиция",
-                                onClick = { 
-                                    condition = "Кондиция"
-                                    reason = ""
-                                    showReasonError = false
-                                },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = MaterialTheme.colors.primary
-                                )
-                            )
-                            Text(
-                                "Кондиция",
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
-                        }
-                        
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            RadioButton(
-                                selected = condition == "Некондиция",
-                                onClick = { condition = "Некондиция" },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = MaterialTheme.colors.primary
-                                )
-                            )
-                            Text(
-                                "Некондиция",
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
-                        }
-                    }
-                    
-                    // Выпадающий список причин некондиции
-                    if (condition == "Некондиция") {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        ExposedDropdownMenuBox(
-                            expanded = expanded,
-                            onExpandedChange = { expanded = !expanded },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            OutlinedTextField(
-                                value = reason,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { 
-                                    Text(
-                                        "Причина некондиции",
-                                        fontSize = 10.sp
-                                    ) 
-                                },
-                                trailingIcon = {
-                                    Icon(
-                                        if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-                                        "Развернуть",
-                                        Modifier.size(16.dp)
-                                    )
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                                isError = showReasonError && reason.isEmpty()
-                            )
-                            
-                            ExposedDropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false }
-                            ) {
-                                ConditionReasons.reasons.forEach { reasonOption ->
-                                    DropdownMenuItem(
-                                        onClick = {
-                                            reason = reasonOption
-                                            expanded = false
-                                            showReasonError = false
-                                        }
-                                    ) {
-                                        Text(
-                                            text = reasonOption,
-                                            fontSize = 12.sp
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        
-                        if (showReasonError && reason.isEmpty()) {
-                            Text(
-                                text = "Выберите причину некондиции",
-                                color = MaterialTheme.colors.error,
-                                style = MaterialTheme.typography.caption,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                            )
-                        }
-                    }
-                }
-            }
+
 
             // Кнопка сохранения
             Button(
                 onClick = {
-                    if (condition == "Некондиция" && reason.isEmpty()) {
-                        showReasonError = true
-                        return@Button
-                    }
-
-                    // Проверяем срок годности перед сохранением только если не пропущен
-                    if (!skipExpirationDate) {
-                        val isoDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            try {
-                                val date = LocalDate.parse(endDate, DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                                date.format(DateTimeFormatter.ISO_DATE)
-                            } catch (e: Exception) {
-                                Log.e("ExpirationDateScreen", "Ошибка преобразования даты: ${e.message}")
-                                ""
-                            }
-                        } else {
-                            DateUtils.convertToIsoFormat(endDate)
-                        }
-
-                        if (isoDate.isNotEmpty()) {
-                            val validatedIsoDate = ProductMovementHelper.processExpirationDate(isoDate)
-                            if (ExpirationDateValidator.isExpired(validatedIsoDate) && condition == "Кондиция") {
-                                showExpirationAlert = true
-                                return@Button
-                            }
-                        }
-                    }
+                    // Устанавливаем состояние "Кондиция" по умолчанию
+                    val finalCondition = "Кондиция"
+                    val finalReason = ""
                     
-                    // Сохраняем данные только если все проверки пройдены
-                    if (!showExpirationAlert) {
-                        val finalStartDate = if (skipExpirationDate) "01.01.2999" else startDate
-                        val finalDays = if (skipExpirationDate) "" else days
-                        val finalMonths = if (skipExpirationDate) "" else months
-                        
-                        viewModel.saveExpirationData(
-                            startDate = finalStartDate,
-                            days = finalDays,
-                            months = finalMonths,
-                            condition = condition,
-                            reason = reason
-                        )
-                        navController.navigate("scan_ir_location") {
+                    // Сохраняем данные
+                    val finalStartDate = if (skipExpirationDate) "01.01.2999" else startDate
+                    val finalDays = if (skipExpirationDate) "" else days
+                    val finalMonths = if (skipExpirationDate) "" else months
+                    
+                    viewModel.saveExpirationData(
+                        startDate = finalStartDate,
+                        days = finalDays,
+                        months = finalMonths,
+                        condition = finalCondition,
+                        reason = finalReason
+                    )
+                                            navController.navigate("scan_buffer_location") {
                             popUpTo("expiration_date") { inclusive = true }
                         }
-                    }
                 },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
                     .height(36.dp),
-                enabled = (skipExpirationDate || (startDate.isNotEmpty() && endDate.isNotEmpty())) && 
-                         (condition == "Кондиция" || (condition == "Некондиция" && reason.isNotEmpty())),
+                enabled = skipExpirationDate || (startDate.isNotEmpty() && endDate.isNotEmpty()),
                 colors = ButtonDefaults.buttonColors(
                     backgroundColor = MaterialTheme.colors.primary,
                     contentColor = Color.White

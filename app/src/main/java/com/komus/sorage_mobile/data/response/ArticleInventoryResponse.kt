@@ -25,6 +25,7 @@ data class ArticletItem(
     val prunitName: String,
     val wrShk: String,
     val idScklad: Int,
+    val name_wr_shk: String,
     val conditionState: String,
     val expirationDate: String,
     val createDate: String,

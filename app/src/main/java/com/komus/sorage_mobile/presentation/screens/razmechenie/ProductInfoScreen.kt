@@ -1,5 +1,6 @@
 package com.komus.sorage_mobile.presentation.screens.razmechenie
 
+import android.os.Build
 import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,6 +14,8 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -236,171 +239,11 @@ fun ProductInfoScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = {
-                // Переходим на экран сканирования ячейки для буфера
-                navController.navigate("scan_buffer_location")
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = Color(0xFF2196F3)
-            )
-        ) {
-            Icon(
-                imageVector = Icons.Default.Storage,
-                contentDescription = "Разместить в буфер",
-                modifier = Modifier.padding(end = 8.dp)
-            )
-            Text("Разместить в буфер")
-        }
+
     }
 }
 
-@Composable
-fun ScanLocationScreen(
-    navController: NavController,
-    spHelper: SPHelper,
-    scannerViewModel: ScannerViewModel = hiltViewModel()
-) {
-    val scrollState = rememberScrollState()
-    var locationId by remember { mutableStateOf("") }
-    val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
-    var showSuccessDialog by remember { mutableStateOf(false) }
-    var showErrorDialog by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf("") }
 
-    LaunchedEffect(barcodeData) {
-        if (barcodeData.isNotEmpty()) {
-            locationId = barcodeData
-            scannerViewModel.clearBarcode()
-        }
-    }
-
-    // Диалог ошибки
-    if (showErrorDialog) {
-        AlertDialog(
-            onDismissRequest = { showErrorDialog = false },
-            title = { Text("Ошибка") },
-            text = { Text(errorMessage) },
-            confirmButton = {
-                Button(onClick = { showErrorDialog = false }) {
-                    Text("OK")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
-    }
-    
-    // Диалог успешного размещения
-    if (showSuccessDialog) {
-        AlertDialog(
-            onDismissRequest = { showSuccessDialog = false },
-            title = { Text("Успешно!") },
-            text = { 
-                Column {
-                    Text("Товар успешно размещен в ячейке:")
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = locationId,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colors.primary
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showSuccessDialog = false
-                        navController.popBackStack("product_info", inclusive = true)
-                        navController.navigate(Screen.Placement.route)
-                    }
-                ) {
-                    Text("OK")
-                }
-            },
-            backgroundColor = Color.White,
-            contentColor = MaterialTheme.colors.onSurface
-        )
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(scrollState),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            elevation = 4.dp,
-            shape = RoundedCornerShape(8.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = "Сканирование ячейки",
-                    style = MaterialTheme.typography.h6,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "Для подтверждения отсканируйте ШК ячейки размещения",
-                    style = MaterialTheme.typography.body1,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-                
-                if (locationId.isNotEmpty()) {
-                    Text(
-                        text = "Ячейка: $locationId",
-                        style = MaterialTheme.typography.body1,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colors.primary
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-                
-                Button(
-                    onClick = {
-                        // Проверяем срок годности перед размещением
-                        val expirationDate = spHelper.getSrokGodnosti()
-                        val condition = spHelper.getCondition()
-                        
-                        if (ExpirationDateValidator.isExpired(expirationDate) && condition == "Кондиция") {
-                            errorMessage = "Невозможно разместить товар с истекшим сроком годности в состоянии 'Кондиция'"
-                            showErrorDialog = true
-                            return@Button
-                        }
-                        
-                        navController.navigate("product_info") {
-                            popUpTo("scan_ir_location") { inclusive = true }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = MaterialTheme.colors.primary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Сканировать",
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text("Сканировать")
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun ScanBufferLocationScreen(
@@ -418,7 +261,10 @@ fun ScanBufferLocationScreen(
     var errorMessage by remember { mutableStateOf("") }
     var successMessage by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
-    
+    var manualInput by remember { mutableStateOf("") }
+    val isCipherLabDevice = remember { Build.MANUFACTURER.contains("cipherlab", ignoreCase = true) }
+    val manualInputFocusRequester = remember { FocusRequester() }
+
     // Обработка состояния размещения
     LaunchedEffect(placementState) {
         when (placementState) {
@@ -440,6 +286,34 @@ fun ScanBufferLocationScreen(
             }
         }
     }
+    LaunchedEffect(manualInput) {
+        if (isCipherLabDevice && manualInput.length in 3..64) {
+            locationId = manualInput
+            manualInput = ""
+
+            Log.d("ScanBufferLocationScreen", "Введён ШК вручную: $locationId")
+
+            // Автоматически устанавливаем состояние "Кондиция"
+            spHelper.saveCondition("Кондиция")
+            spHelper.saveReason("")
+
+            spHelper.saveBufferLocation(locationId)
+            spHelper.saveWrShk(locationId)
+            spHelper.saveSkladId("1383")
+
+            val productId = spHelper.getProductId()
+            val brief = spHelper.getBrief()
+            val fullQnt = spHelper.getFullQnt()
+
+            Log.d("ScanBufferLocationScreen", "Отправка запроса на размещение (ручной ввод): productId=$productId, prunitId=$brief, quantity=$fullQnt")
+
+            placementViewModel.placeProductToBuffer(
+                productId = productId,
+                prunitId = brief,
+                quantity = fullQnt
+            )
+        }
+    }
 
     LaunchedEffect(barcodeData) {
         if (barcodeData.isNotEmpty()) {
@@ -448,15 +322,9 @@ fun ScanBufferLocationScreen(
 
             Log.d("ScanBufferLocationScreen", "Получен штрих-код: $locationId")
 
-            // Проверяем срок годности перед размещением
-            val expirationDate = spHelper.getSrokGodnosti()
-            val condition = spHelper.getCondition()
-            
-            if (ExpirationDateValidator.isExpired(expirationDate) && condition == "Кондиция") {
-                errorMessage = "Невозможно разместить товар с истекшим сроком годности в состоянии 'Кондиция'"
-                showErrorDialog = true
-                return@LaunchedEffect
-            }
+            // Автоматически устанавливаем состояние "Кондиция"
+            spHelper.saveCondition("Кондиция")
+            spHelper.saveReason("")
 
             // Сохраняем ячейку буфера
             spHelper.saveBufferLocation(locationId)
@@ -483,7 +351,7 @@ fun ScanBufferLocationScreen(
             onDismissRequest = { 
                 showSuccessDialog = false
                 placementViewModel.resetState()
-                navController.popBackStack("product_info", inclusive = true)
+                navController.popBackStack("scan_buffer_location", inclusive = true)
                 navController.navigate(Screen.Placement.route)
             },
             title = { Text("Успешно!") },
@@ -503,7 +371,7 @@ fun ScanBufferLocationScreen(
                     onClick = { 
                         showSuccessDialog = false
                         placementViewModel.resetState()
-                        navController.popBackStack("product_info", inclusive = true)
+                        navController.popBackStack("scan_buffer_location", inclusive = true)
                         navController.navigate(Screen.Placement.route)
                     }
                 ) {
@@ -575,7 +443,29 @@ fun ScanBufferLocationScreen(
                     style = MaterialTheme.typography.body1,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
-                
+
+                if (isCipherLabDevice) {
+                    OutlinedTextField(
+                        value = manualInput,
+                        onValueChange = { manualInput = it },
+                        label = { Text("ШК ячейки буфера (ввод)") },
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .focusRequester(manualInputFocusRequester),
+                        singleLine = true
+                    )
+                    
+                    // Автофокус на поле ввода при показе
+                    LaunchedEffect(isCipherLabDevice) {
+                        if (isCipherLabDevice) {
+                            kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+                            manualInputFocusRequester.requestFocus()
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                }
+
                 if (locationId.isNotEmpty()) {
                     Text(
                         text = "Ячейка буфера: $locationId",

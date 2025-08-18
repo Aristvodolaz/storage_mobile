@@ -16,7 +16,6 @@ import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ProductInfoScreen
-import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanLocationScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanBufferLocationScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.SearchScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.UnitSelectionScreen
@@ -196,9 +195,7 @@ fun NavigationGraph(
                 ProductInfoScreen(navController, spHelper = spHelper)
             }
             
-            composable("scan_ir_location") { 
-                ScanLocationScreen(navController, spHelper = spHelper, scannerViewModel)
-            }
+
             
             composable("scan_buffer_location") {
                 ScanBufferLocationScreen(navController, spHelper = spHelper, scannerViewModel)

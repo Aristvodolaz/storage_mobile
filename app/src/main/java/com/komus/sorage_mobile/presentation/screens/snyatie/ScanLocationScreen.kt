@@ -22,6 +22,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -66,11 +68,19 @@ fun ScanLocationScreen(
     var validationError by remember { mutableStateOf<String?>(null) }
     
     val scrollState = rememberScrollState()
+    val quantityFocusRequester = remember { FocusRequester() }
+    val locationFocusRequester = remember { FocusRequester() }
     
     // Скрываем индикатор прокрутки после небольшой задержки
     LaunchedEffect(Unit) {
         delay(3000)
         showScrollIndicator = false
+    }
+    
+    // Автофокус на поле ячейки при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        locationFocusRequester.requestFocus()
     }
     
     // Очищаем состояние при входе на экран
@@ -204,10 +214,20 @@ fun ScanLocationScreen(
                         },
                         label = { Text("Количество", fontSize = 10.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(quantityFocusRequester),
                         singleLine = true,
                         textStyle = LocalTextStyle.current.copy(fontSize = 12.sp)
                     )
+                    
+                    // Автофокус на поле количества при показе диалога
+                    LaunchedEffect(showQuantityDialog) {
+                        if (showQuantityDialog) {
+                            kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+                            quantityFocusRequester.requestFocus()
+                        }
+                    }
                     
                     // Отображение ошибки валидации
                     validationError?.let {
@@ -513,7 +533,9 @@ fun ScanLocationScreen(
                                                 fontSize = 10.sp
                                             ) 
                                         },
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .focusRequester(locationFocusRequester),
                                         singleLine = true,
                                         textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                         leadingIcon = {

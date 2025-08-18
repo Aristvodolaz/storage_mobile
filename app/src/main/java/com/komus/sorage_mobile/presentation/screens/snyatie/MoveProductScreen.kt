@@ -49,6 +49,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -107,10 +109,21 @@ fun MoveProductScreen(
     var scanMode by remember { mutableStateOf(ScanMode.SOURCE_LOCATION) }
     var selectedItem by remember { mutableStateOf<LocationItem?>(null) }
     var showQuantityInput by remember { mutableStateOf(false) }
+    val quantityFocusRequester = remember { FocusRequester() }
+    val sourceLocationFocusRequester = remember { FocusRequester() }
+    val expirationDateFocusRequester = remember { FocusRequester() }
+    val executorFocusRequester = remember { FocusRequester() }
+    val targetLocationFocusRequester = remember { FocusRequester() }
     
     // Получаем имя пользователя из SharedPreferences
     LaunchedEffect(Unit) {
         executor = scannerViewModel.getUserName()
+    }
+    
+    // Автофокус на поле исходной ячейки при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        sourceLocationFocusRequester.requestFocus()
     }
     
     // Обработка сканирования
@@ -131,14 +144,14 @@ fun MoveProductScreen(
                         selectedItem!!.units[0].expirationDate?.let {
                             pickViewModel.moveProduct(
                                 quantity = quantity.toInt(),
-                                conditionState = selectedItem!!.units[0].conditionState,
+                                conditionState = "good", // Автоматически используем состояние "Кондиция"
                                 expirationDate = it,
                                 executor = executor
                             )
                         } ?: run {
                             pickViewModel.moveProduct(
                                 quantity = quantity.toInt(),
-                                conditionState = selectedItem!!.units[0].conditionState,
+                                conditionState = "good", // Автоматически используем состояние "Кондиция"
                                 expirationDate = "2025-01-01",
                                 executor = executor
                             )
@@ -288,7 +301,9 @@ fun MoveProductScreen(
                                 }
                             },
                             label = { Text("ID исходной ячейки") },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .focusRequester(sourceLocationFocusRequester),
                             singleLine = true,
                             colors = TextFieldDefaults.outlinedTextFieldColors(
                                 focusedBorderColor = MaterialTheme.colors.primary,
@@ -521,7 +536,9 @@ fun MoveProductScreen(
                                     quantity = newValue
                                 },
                                 label = { Text("Количество") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(quantityFocusRequester),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 colors = TextFieldDefaults.outlinedTextFieldColors(
@@ -530,18 +547,22 @@ fun MoveProductScreen(
                                 )
                             )
                             
+                            // Автофокус на поле количества при показе
+                            LaunchedEffect(showQuantityInput) {
+                                if (showQuantityInput) {
+                                    kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+                                    quantityFocusRequester.requestFocus()
+                                }
+                            }
+                            
                             Spacer(modifier = Modifier.height(8.dp))
                             
-                            OutlinedTextField(
-                                value = conditionState,
-                                onValueChange = { conditionState = it },
-                                label = { Text("Состояние товара") },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                colors = TextFieldDefaults.outlinedTextFieldColors(
-                                    focusedBorderColor = MaterialTheme.colors.primary,
-                                    unfocusedBorderColor = MaterialTheme.colors.primary.copy(alpha = 0.5f)
-                                )
+                            // Автоматически используется состояние "Кондиция"
+                            Text(
+                                text = "Состояние товара: Кондиция",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colors.primary
                             )
                             
                             Spacer(modifier = Modifier.height(8.dp))
@@ -558,7 +579,9 @@ fun MoveProductScreen(
                                         value = expirationDate,
                                         onValueChange = { expirationDate = it },
                                         label = { Text("Срок годности (ГГГГ-ММ-ДД)") },
-                                        modifier = Modifier.weight(1f),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .focusRequester(expirationDateFocusRequester),
                                         singleLine = true,
                                         colors = TextFieldDefaults.outlinedTextFieldColors(
                                             focusedBorderColor = MaterialTheme.colors.primary,
@@ -616,7 +639,9 @@ fun MoveProductScreen(
                                 value = executor,
                                 onValueChange = { executor = it },
                                 label = { Text("Исполнитель") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(executorFocusRequester),
                                 singleLine = true,
                                 colors = TextFieldDefaults.outlinedTextFieldColors(
                                     focusedBorderColor = MaterialTheme.colors.primary,
@@ -655,7 +680,9 @@ fun MoveProductScreen(
                                     pickViewModel.setTargetLocation(it)
                                 },
                                 label = { Text("ID целевой ячейки") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(targetLocationFocusRequester),
                                 singleLine = true,
                                 colors = TextFieldDefaults.outlinedTextFieldColors(
                                     focusedBorderColor = MaterialTheme.colors.primary,

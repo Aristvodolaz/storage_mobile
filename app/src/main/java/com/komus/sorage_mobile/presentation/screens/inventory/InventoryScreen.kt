@@ -24,6 +24,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.AlertDialog
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Card
@@ -101,6 +103,7 @@ fun InventoryScreen(
     val scaffoldState = rememberScaffoldState()
     val keyboardController = LocalSoftwareKeyboardController.current
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
+    val searchFocusRequester = remember { FocusRequester() }
 
 
     // Отображение сообщения об ошибке в Snackbar
@@ -121,6 +124,12 @@ fun InventoryScreen(
             viewModel.setSearchQuery(barcodeData)
         }
         scannerViewModel.clearBarcode()
+    }
+    
+    // Автофокус на поисковое поле при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        searchFocusRequester.requestFocus()
     }
     Scaffold(
         scaffoldState = scaffoldState,
@@ -267,7 +276,8 @@ fun InventoryScreen(
                     },
                     modifier = Modifier
                         .weight(1f)
-                        .height(48.dp),
+                        .height(48.dp)
+                        .focusRequester(searchFocusRequester),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = if (uiState.searchType == SearchType.LOCATION_ID) 
@@ -428,7 +438,7 @@ fun InventoryItemCard(item: InventoryItem, onClick: () -> Unit) {
                     Spacer(modifier = Modifier.width(8.dp))
                     
                     Text(
-                        text = "Ячейка: ${item.locationId}",
+                        text = "Ячейка: ${item.name_wr_shk}",
                         fontSize = 10.sp,
                         color = Color.Gray,
                         maxLines = 1,
@@ -490,7 +500,7 @@ fun ItemDetailsDialog(
                 
                 InfoRow(
                     label = "Ячейка:",
-                    value = item.locationName.ifEmpty { item.locationId }
+                    value = item.name_wr_shk.ifEmpty { item.locationId }
                 )
 
                 
@@ -600,6 +610,7 @@ fun UpdateQuantityDialog(
     var startDate by remember { mutableStateOf("") }
     var days by remember { mutableStateOf("") }
     var months by remember { mutableStateOf("") }
+    val quantityFocusRequester = remember { FocusRequester() }
     var expirationDate by remember { 
         mutableStateOf(
             try {
@@ -720,8 +731,16 @@ fun UpdateQuantityDialog(
                         onDone = { keyboardController?.hide() }
                     ),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(quantityFocusRequester)
                 )
+                
+                // Автофокус на поле количества при открытии диалога
+                LaunchedEffect(Unit) {
+                    kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+                    quantityFocusRequester.requestFocus()
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

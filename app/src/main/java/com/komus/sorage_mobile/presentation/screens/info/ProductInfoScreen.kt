@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -45,6 +47,7 @@ fun ProductInfoScreen(
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val focusManager = LocalFocusManager.current
+    val searchFocusRequester = remember { FocusRequester() }
     
     // Обработка результата сканирования
     LaunchedEffect(barcodeData) {
@@ -54,6 +57,12 @@ fun ProductInfoScreen(
             scannerViewModel.clearBarcode()
             focusManager.clearFocus()
         }
+    }
+    
+    // Автофокус на поисковое поле при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        searchFocusRequester.requestFocus()
     }
     
     // Обработка эффектов
@@ -184,7 +193,9 @@ fun ProductInfoScreen(
                                     ProductInfoViewModel.UiEvent.OnSearchQueryChanged(query)
                                 )
                             },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(searchFocusRequester),
                             label = {
                                 Text(
                                     when (uiState.searchType) {

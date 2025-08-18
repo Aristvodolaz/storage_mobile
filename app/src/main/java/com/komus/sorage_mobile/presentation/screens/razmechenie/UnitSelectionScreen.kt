@@ -15,6 +15,8 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -38,6 +40,7 @@ fun UnitSelectionScreen(
     var quantity by remember { mutableStateOf("") }
     var showQuantityInput by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
+    val quantityFocusRequester = remember { FocusRequester() }
 
     LaunchedEffect(productId) {
         unitViewModel.fetchUnits(productId)
@@ -220,13 +223,23 @@ fun UnitSelectionScreen(
                                             fontSize = 10.sp
                                         )
                                     },
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(quantityFocusRequester),
                                     textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
                                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                         keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
                                     ),
                                     singleLine = true
                                 )
+                                
+                                // Автофокус на поле количества при показе
+                                LaunchedEffect(showQuantityInput) {
+                                    if (showQuantityInput) {
+                                        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+                                        quantityFocusRequester.requestFocus()
+                                    }
+                                }
                                 
                                 Spacer(modifier = Modifier.height(4.dp))
                                 

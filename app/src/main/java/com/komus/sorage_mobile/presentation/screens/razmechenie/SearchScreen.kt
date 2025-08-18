@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,11 +48,18 @@ fun SearchScreen(
     val searchState by searchViewModel.searchState.collectAsStateWithLifecycle()
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
     var navigating by remember { mutableStateOf(false) }
+    val searchFocusRequester = remember { FocusRequester() }
     
     // Сбрасываем состояние при входе на экран
     LaunchedEffect(Unit) {
         searchViewModel.resetState()
         navigating = false
+    }
+    
+    // Автофокус на поисковое поле при загрузке экрана
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        searchFocusRequester.requestFocus()
     }
 
     // Автопоиск при сканировании
@@ -141,7 +150,9 @@ fun SearchScreen(
                             },
                             singleLine = true,
                             textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(searchFocusRequester),
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Search,

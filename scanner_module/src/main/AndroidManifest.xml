@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.BROADCAST_STICKY" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- CipherLab specific permissions -->
+    <uses-permission android:name="com.cipherlab.barcode.DECODE" />
+    <uses-permission android:name="com.cipherlab.barcode.SETTINGS" />
+
     <!-- Объявление возможностей устройства -->
     <uses-feature android:name="android.hardware.camera" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
@@ -23,6 +27,19 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.symbol.datawedge.api.RESULT_ACTION" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- CipherLab BroadcastReceiver -->
+        <receiver
+            android:name=".CipherLabBroadcastReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.komus.scanner_module.ACTION_BARCODE_SCAN" />
+                <action android:name="com.cipherlab.barcode.SOFTTRIGGER_DATA" />
+                <action android:name="com.cipherlab.barcode.READERSERVICE_ERROR" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </receiver>

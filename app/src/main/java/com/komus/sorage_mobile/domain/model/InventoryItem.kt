@@ -10,6 +10,7 @@ data class InventoryItem(
     val barcode: String,
     val locationId: String,
     val locationName: String,
+    val name_wr_shk: String,
     val expectedQuantity: Int,
     val actualQuantity: Int = expectedQuantity,
     val isChecked: Boolean = false,

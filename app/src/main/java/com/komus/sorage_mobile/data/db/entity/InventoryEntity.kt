@@ -39,6 +39,7 @@ data class InventoryEntity(
             expirationDate = expirationDate,
             condition = condition,
             reason = reason,
+            name_wr_shk = name,
             isChecked = false
         )
     }

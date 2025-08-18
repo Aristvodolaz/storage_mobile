@@ -73,6 +73,7 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+    implementation (files("libs/BarcodeAPI_V1_1_59.jar"))
 
     // Hilt
     implementation("com.google.dagger:hilt-android:2.50")

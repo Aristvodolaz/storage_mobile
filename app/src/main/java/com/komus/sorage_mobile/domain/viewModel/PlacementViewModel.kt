@@ -44,11 +44,7 @@ class PlacementViewModel @Inject constructor(
         val skladId = spHelper.getSkladId()
         val productQnt = spHelper.getProductQnt()
 
-        // Проверяем валидность срока годности для указанного состояния
-        if (!ExpirationDateValidator.isValidForCondition(expirationDate, condition)) {
-            _state.value = PlacementState.Error("Невозможно разместить товар с истекшим сроком годности в состоянии 'Кондиция'")
-            return
-        }
+        // Автоматически используем состояние "Кондиция" без проверок срока годности
 
         Log.d("PlacementViewModel", """
         Размещение товара в буфер:

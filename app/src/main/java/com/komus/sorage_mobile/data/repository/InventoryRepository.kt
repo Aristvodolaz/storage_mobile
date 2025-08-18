@@ -56,6 +56,7 @@ class InventoryRepository @Inject constructor(
                         isChecked = false,
                         expirationDate = product.units[0].expirationDate ?: "",
                         condition = product.units[0].conditionState ,
+                        name_wr_shk = product.units[0].name_wr_shk,
                         reason = null
                     )
                 }
@@ -112,6 +113,7 @@ class InventoryRepository @Inject constructor(
                         expectedQuantity = item.productQnt,
                         actualQuantity = item.placeQnt,
                         isChecked = false,
+                        name_wr_shk = item.name_wr_shk,
                         expirationDate = item.expirationDate ?: "",
                         condition =item.conditionState ,
                         reason = null
