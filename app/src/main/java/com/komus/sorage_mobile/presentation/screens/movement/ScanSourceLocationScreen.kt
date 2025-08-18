@@ -461,6 +461,9 @@ fun ExpirationAndConditionDialog(
                                 months = ""
                                 finalDate = "01.01.2999"
                                 skipExpirationDate = true
+                                
+                                // Автоматически вызываем onConfirm с пропущенным сроком годности
+                                onConfirm("2999-01-01", "Кондиция", null)
                             },
                             modifier = Modifier.height(56.dp),
                             colors = ButtonDefaults.buttonColors(

@@ -152,6 +152,23 @@ fun ExpirationDateScreen(
                                     months = ""
                                     endDate = "01.01.2999"
                                     skipExpirationDate = true
+                                    
+                                    // Автоматически выполняем логику сохранения
+                                    val finalCondition = "Кондиция"
+                                    val finalReason = ""
+                                    
+                                    viewModel.saveExpirationData(
+                                        startDate = "01.01.2999",
+                                        days = "",
+                                        months = "",
+                                        condition = finalCondition,
+                                        reason = finalReason
+                                    )
+                                    
+                                    // Переходим на следующий экран
+                                    navController.navigate("scan_buffer_location") {
+                                        popUpTo("expiration_date") { inclusive = true }
+                                    }
                                 },
                                 modifier = Modifier.height(56.dp),
                                 colors = ButtonDefaults.buttonColors(
