@@ -414,37 +414,33 @@ fun InventoryItemCard(item: InventoryItem, onClick: () -> Unit) {
             
             Spacer(modifier = Modifier.width(8.dp))
             
-            // Информация о товаре
+            // Информация о товаре: артикул — основной шрифт, наименование — вторичный
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = item.name,
+                    text = "Артикул: ${item.article}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                Row {
-                    Text(
-                        text = "Артикул: ${item.article}",
-                        fontSize = 10.sp,
-                        color = Color.Gray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-                    
-                    Text(
-                        text = "Ячейка: ${item.name_wr_shk}",
-                        fontSize = 10.sp,
-                        color = Color.Gray,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    text = item.name,
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                
+                Text(
+                    text = "Ячейка: ${item.name_wr_shk}",
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             
             // Количество

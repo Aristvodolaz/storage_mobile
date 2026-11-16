@@ -1,6 +1,8 @@
 package com.komus.sorage_mobile.data.repository
 
+import androidx.room.withTransaction
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.db.AppDatabase
 import com.komus.sorage_mobile.data.db.dao.InventoryDao
 import com.komus.sorage_mobile.data.db.entity.StorageItemEntity
 import com.komus.sorage_mobile.util.NetworkUtils
@@ -15,6 +17,7 @@ import com.komus.sorage_mobile.data.response.ProductInfoResponse
 class StorageRepository @Inject constructor(
     private val api: StorageApi,
     private val dao: InventoryDao,
+    private val db: AppDatabase,
     private val networkUtils: NetworkUtils
 ) {
     companion object {
@@ -32,8 +35,6 @@ class StorageRepository @Inject constructor(
             val response = api.getAllStorageItems()
 
             if (response.success && response.data.items.isNotEmpty()) {
-                dao.clearStorageItems()
-
                 val items = response.data.items.map { dto ->
                     StorageItemEntity(
                         id = dto.id,
@@ -55,7 +56,11 @@ class StorageRepository @Inject constructor(
                     )
                 }
 
-                dao.insertStorageItems(items)
+                // Очистка и запись в одной транзакции: при обрыве справочник не останется пустым
+                db.withTransaction {
+                    dao.clearStorageItems()
+                    dao.insertStorageItems(items)
+                }
                 Log.d(TAG, "Синхронизация storage items завершена успешно. Сохранено ${items.size} записей")
             } else {
                 Log.e(TAG, "Ошибка при синхронизации storage items: пустой ответ от сервера или ошибка в ответе")

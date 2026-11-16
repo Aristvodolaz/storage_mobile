@@ -38,7 +38,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.komus.scanner_module.ScannerViewModel
+import com.komus.sorage_mobile.data.model.ConditionReasons
 import com.komus.sorage_mobile.data.response.LocationItem
+import com.komus.sorage_mobile.data.response.availableExQuantity
+import com.komus.sorage_mobile.data.response.exNesting
+import com.komus.sorage_mobile.data.response.placeQuantity
 import com.komus.sorage_mobile.domain.state.LocationItemsState
 import com.komus.sorage_mobile.domain.state.PickState
 import com.komus.sorage_mobile.domain.viewModel.PickViewModel
@@ -96,14 +100,13 @@ fun ScanLocationScreen(
         if (barcodeData.isNotEmpty()) {
             val scannedCode = barcodeData
             scannerViewModel.clearBarcode()
-            
+
             when (scanMode) {
                 ScanMode.LOCATION -> {
                     Log.d("ScanLocationScreen", "Сканирована ячейка: $scannedCode")
                     locationId = scannedCode
-                    pickViewModel.getLocationItems(locationId)
+                    pickViewModel.getLocationItems(scannedCode)
                 }
-
                 ScanMode.PRODUCT -> TODO()
             }
         }
@@ -130,6 +133,11 @@ fun ScanLocationScreen(
     
     // Диалог ввода количества для снятия товара
     if (showQuantityDialog && selectedItem != null) {
+        val selectedUnit = selectedItem!!.units.firstOrNull()
+        val availableUnits = selectedUnit?.placeQuantity() ?: 0.0
+        val productQnt = selectedUnit?.exNesting()?.toDouble() ?: 1.0
+        val availableEx = selectedItem!!.availableExQuantity()
+
         AlertDialog(
             onDismissRequest = { 
                 showQuantityDialog = false 
@@ -165,27 +173,23 @@ fun ScanLocationScreen(
                     )
                     
                     Spacer(modifier = Modifier.height(2.dp))
-                    
-                    // Получаем количество из первого элемента units, если он есть
-                    val availableQuantity = if (selectedItem!!.units.isNotEmpty()) {
-                        selectedItem!!.units[0].quantity
-                    } else {
-                        selectedItem!!.units[0].quantity?.toString() ?: "Н/Д"
-                    }
-
-                    val productQnt = selectedItem?.units?.getOrNull(0)?.productQnt?.toDouble() ?: 1.0
-                    val justCoun = availableQuantity.toDouble() / productQnt
-
 
                     Text(
-                        text = "Доступное количество ЕХ для снятия: $justCoun",
+                        text = "Доступное количество ЕХ для снятия: $availableEx",
                         style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
                         fontSize = 10.sp
                     )
                     Text(
-                        text = "Общее кол-во в ед.: $availableQuantity",
+                        text = "Общее кол-во в ед.: ${availableUnits.toInt()}",
+                        style = MaterialTheme.typography.caption,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colors.primary,
+                        fontSize = 10.sp
+                    )
+                    Text(
+                        text = "Вложенность ЕХ: ${productQnt.toInt()}",
                         style = MaterialTheme.typography.caption,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colors.primary,
@@ -205,15 +209,21 @@ fun ScanLocationScreen(
                     
                     TextField(
                         value = quantity,
-                        onValueChange = { 
-                            // Проверяем, что введено число
+                        onValueChange = {
                             if (it.isEmpty() || it.all { char -> char.isDigit() }) {
                                 quantity = it
-                                validationError = null
+                                val enteredEx = it.toIntOrNull() ?: 0
+                                validationError = when {
+                                    it.isEmpty() -> null
+                                    enteredEx <= 0 -> "Количество должно быть больше нуля"
+                                    enteredEx > availableEx -> "Недостаточное количество: доступно $availableEx ЕХ, запрошено $enteredEx"
+                                    else -> null
+                                }
                             }
                         },
-                        label = { Text("Количество", fontSize = 10.sp) },
+                        label = { Text("Количество (ЕХ)", fontSize = 10.sp) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        isError = validationError != null,
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(quantityFocusRequester),
@@ -356,32 +366,24 @@ fun ScanLocationScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (quantity.isNotEmpty()) {
-                            val qnt = quantity.toInt()
-                            
-                            // Получаем доступное количество
-                            val availableQuantity = if (selectedItem!!.units.isNotEmpty()) {
-                                selectedItem!!.units[0].quantity.toIntOrNull() ?: 0
-                            } else {
-                                selectedItem!!.units[0].quantity ?: 0
-                            }
-                            
-                            if (qnt <= 0) {
-                                validationError = "Количество должно быть больше нуля"
-                            } else {
-                                // Выполняем снятие товара
-                                Log.d("ScanLocationScreen", "Снятие товара: ${selectedItem!!.id}, количество: $qnt")
+                        val qnt = quantity.toIntOrNull()
+                        when {
+                            qnt == null -> validationError = "Введите количество"
+                            qnt <= 0 -> validationError = "Количество должно быть больше нуля"
+                            qnt > availableEx -> validationError = "Недостаточное количество: доступно $availableEx ЕХ, запрошено $qnt"
+                            else -> {
+                                Log.d("ScanLocationScreen", "Снятие товара: ${selectedItem!!.id}, количество ЕХ: $qnt")
                                 pickViewModel.pickFromLocationBySkladId(
                                     qnt,
                                     spHelper.getUserName()
                                 )
-                                // Не закрываем диалог здесь, он закроется только при успешном результате
                             }
-                        } else {
-                            validationError = "Введите количество"
                         }
                     },
-                    enabled = pickState !is PickState.Loading,
+                    enabled = pickState !is PickState.Loading &&
+                            pickState !is PickState.Error &&
+                            validationError == null &&
+                            (quantity.toIntOrNull() ?: 0) in 1..availableEx,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text("ПОДТВЕРДИТЬ", fontSize = 10.sp)
@@ -614,7 +616,7 @@ fun ScanLocationScreen(
                 }
                 
                 Spacer(modifier = Modifier.height(4.dp))
-                
+
                 // Отображение состояния загрузки или результатов
                 when (locationItemsState) {
                     is LocationItemsState.Loading -> {
@@ -769,7 +771,7 @@ fun ScanLocationScreen(
                                         selectedItem = item
                                         pickViewModel.selectItem(item)
                                         showQuantityDialog = true
-                                        quantity = ""
+                                        quantity = item.availableExQuantity().takeIf { it > 0 }?.toString() ?: ""
                                         validationError = null
                                     }
                                 )
@@ -790,25 +792,72 @@ fun ScanLocationScreen(
 
 @Composable
 fun ProductItemCard(item: LocationItem, onClick: () -> Unit) {
+    // Определяем маркер по причине из первого unit
+    val firstReason = item.units.firstOrNull()?.reason
+    val isBlocked = firstReason == ConditionReasons.BLOCKED
+    val isUncertain = !isBlocked && item.units.any { it.conditionState == "BAD" }
+
+    val cardBgColor = when {
+        isBlocked -> Color(0xFFFFEBEE)
+        isUncertain -> Color(0xFFFFF8E1)
+        else -> MaterialTheme.colors.surface
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .shadow(1.dp, RoundedCornerShape(4.dp)),
         elevation = 1.dp,
-        shape = RoundedCornerShape(4.dp)
+        shape = RoundedCornerShape(4.dp),
+        backgroundColor = cardBgColor
     ) {
         Column(
             modifier = Modifier.padding(6.dp)
         ) {
-            Text(
-                text = item.name,
-                style = MaterialTheme.typography.caption,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = item.name,
+                    style = MaterialTheme.typography.caption,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                if (isBlocked) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFD32F2F)
+                    ) {
+                        Text(
+                            text = "✕",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (isUncertain) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = Color(0xFFF57C00)
+                    ) {
+                        Text(
+                            text = "?",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
             
             Spacer(modifier = Modifier.height(2.dp))
             

@@ -441,7 +441,7 @@ fun CompactLocationProductCard(product: LocationProduct) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                CompactInfoItem(label = "Ячейка:", value = product.wrShk ?: "", modifier = Modifier.weight(1f))
+                CompactInfoItem(label = "Ячейка:", value = product.units[0].nameWrSHk ?: "", modifier = Modifier.weight(1f))
                 
                 // Получаем первый элемент из массива units, если он есть
                 product.units.firstOrNull()?.let { unit ->

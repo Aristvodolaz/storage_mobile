@@ -3,7 +3,9 @@ package com.komus.sorage_mobile.di
 import android.content.Context
 import androidx.room.Room
 import com.komus.sorage_mobile.data.db.AppDatabase
+import com.komus.sorage_mobile.data.db.dao.CacheDao
 import com.komus.sorage_mobile.data.db.dao.InventoryDao
+import com.komus.sorage_mobile.data.db.dao.PendingOperationDao
 import com.komus.sorage_mobile.data.db.dao.PlacementDao
 import com.komus.sorage_mobile.data.db.dao.OfflinePlacementDao
 import com.komus.sorage_mobile.data.db.dao.StorageDao
@@ -14,6 +16,8 @@ import com.komus.sorage_mobile.data.db.migrations.MIGRATION_1_5
 import com.komus.sorage_mobile.data.db.migrations.MIGRATION_2_3
 import com.komus.sorage_mobile.data.db.migrations.MIGRATION_3_4
 import com.komus.sorage_mobile.data.db.migrations.MIGRATION_4_5
+import com.komus.sorage_mobile.data.db.migrations.MIGRATION_8_9
+import com.komus.sorage_mobile.data.db.migrations.MIGRATION_9_10
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,8 +44,11 @@ object DatabaseModule {
             MIGRATION_4_5,
             MIGRATION_1_3,
             MIGRATION_1_4,
-            MIGRATION_1_5
+            MIGRATION_1_5,
+            MIGRATION_8_9,
+            MIGRATION_9_10
         )
+        // shortcut: при отсутствии миграции база сбрасывается, включая очередь; вернуть строгий режим после экспорта схем Room
         .fallbackToDestructiveMigration()
         .build()
     }
@@ -68,6 +75,18 @@ object DatabaseModule {
     @Singleton
     fun provideOfflinePlacementDao(database: AppDatabase): OfflinePlacementDao {
         return database.offlinePlacementDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePendingOperationDao(database: AppDatabase): PendingOperationDao {
+        return database.pendingOperationDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCacheDao(database: AppDatabase): CacheDao {
+        return database.cacheDao()
     }
 
 }

@@ -2,7 +2,7 @@ package com.komus.sorage_mobile.util
 
 import android.content.SharedPreferences
 
-class SPHelper(private val sharedPreferences: SharedPreferences) {
+class SPHelper(private val sharedPreferences: SharedPreferences) : UserSession {
 
     fun saveProductId(productId: String) {
         sharedPreferences.edit().putString("productId", productId).apply()
@@ -118,7 +118,7 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
         sharedPreferences.edit().putString("userName", userName).apply()
     }
 
-    fun getUserName(): String {
+    override fun getUserName(): String {
         return sharedPreferences.getString("userName", "user") ?: "user"
     }
 
@@ -162,7 +162,7 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
         sharedPreferences.edit().putString("skladId", skladId).apply()
     }
 
-    fun getSkladId(): String {
+    override fun getSkladId(): String {
         return sharedPreferences.getString("skladId", "1383") ?: "1383"
     }
 
@@ -177,6 +177,14 @@ class SPHelper(private val sharedPreferences: SharedPreferences) {
 
     fun clearReason() {
         sharedPreferences.edit().remove("reason").apply()
+    }
+
+    fun saveExPalletType(type: String) {
+        sharedPreferences.edit().putString("exPalletType", type).apply()
+    }
+
+    fun getExPalletType(): String {
+        return sharedPreferences.getString("exPalletType", "Евро") ?: "Евро"
     }
 
 }

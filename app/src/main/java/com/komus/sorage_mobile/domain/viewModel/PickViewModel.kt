@@ -3,7 +3,11 @@ package com.komus.sorage_mobile.domain.viewModel
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.offline.ResponseCache
+import com.komus.sorage_mobile.data.response.LocationDetailsResponse
 import com.komus.sorage_mobile.data.response.LocationItem
+import com.komus.sorage_mobile.data.response.exNesting
 import com.komus.sorage_mobile.domain.state.LocationItemsState
 import com.komus.sorage_mobile.domain.state.MoveProductState
 import com.komus.sorage_mobile.domain.state.PickState
@@ -30,12 +34,17 @@ class PickViewModel @Inject constructor(
     private val pickFromLocationBySkladIdUseCase: PickFromLocationBySkladIdUseCase,
     private val moveProductUseCase: MoveProductUseCase,
     private val searchUseCase: SearchUseCase,
-    private val spHelper: SPHelper
+    private val spHelper: SPHelper,
+    private val storageApi: StorageApi,
+    private val cache: ResponseCache
 ) : ViewModel() {
 
     private val _locationItemsState = MutableStateFlow<LocationItemsState>(LocationItemsState.Initial)
     val locationItemsState: StateFlow<LocationItemsState> = _locationItemsState.asStateFlow()
-    
+
+    private val _locationName = MutableStateFlow<String?>(null)
+    val locationName: StateFlow<String?> = _locationName.asStateFlow()
+
     private val _pickState = MutableStateFlow<PickState>(PickState.Initial)
     val pickState: StateFlow<PickState> = _pickState.asStateFlow()
     
@@ -52,6 +61,29 @@ class PickViewModel @Inject constructor(
     private var _sourceLocationId: String = ""
     private var _targetLocationId: String = ""
     
+    fun fetchLocationName(locationId: String) {
+        viewModelScope.launch {
+            try {
+                val skladId = spHelper.getSkladId()
+                val response = cache.fetch(
+                    key = "location-details:$locationId:$skladId",
+                    clazz = LocationDetailsResponse::class.java,
+                    isCacheable = { it.success }
+                ) {
+                    storageApi.getLocationDetails(locationId, skladId)
+                }
+                _locationName.value = response.data?.locationName ?: locationId
+            } catch (e: Exception) {
+                Log.e("PickViewModel", "Ошибка получения имени ячейки: ${e.message}")
+                _locationName.value = locationId
+            }
+        }
+    }
+
+    fun clearLocationName() {
+        _locationName.value = null
+    }
+
     fun getLocationItems(locationId: String) {
         Log.d("PickViewModel", "Запрос товаров в ячейке: $locationId")
         _locationItemsState.value = LocationItemsState.Loading
@@ -97,29 +129,32 @@ class PickViewModel @Inject constructor(
         
         viewModelScope.launch {
             try {
-                val skladId = if (_skladId.isNotEmpty()) _skladId else "1383" // Используем значение по умолчанию, если не задано
+                val skladId = if (_skladId.isNotEmpty()) _skladId else spHelper.getSkladId()
 
                 
-                val response = item.wrShk?.let {
-                    pickFromLocationBySkladIdUseCase(
-                        productId = item.article,
-                        wrShk = it,
-                        prunitId = item.units.firstOrNull()?.prunitId?.toString() ?: "10",
-                        quantity = quantity,
-                        executor = executor,
-                        skladId = skladId,
-                        productQnt = item.units[0].productQnt.toInt()
-                    )
+                val unit = item.units.firstOrNull()
+                val wrShk = item.wrShk?.takeIf { it.isNotBlank() }
+                if (wrShk.isNullOrBlank()) {
+                    _pickState.value = PickState.Error("Не указан штрих-код ячейки")
+                    return@launch
                 }
+                val productQntVal = unit?.exNesting() ?: 1
+                val response = pickFromLocationBySkladIdUseCase(
+                    productId = item.article,
+                    wrShk = wrShk,
+                    prunitId = unit?.prunitId?.toString() ?: "10",
+                    quantity = quantity,
+                    executor = executor,
+                    skladId = skladId,
+                    productQnt = productQntVal
+                )
 
-                if (response != null) {
-                    if (response.success) {
-                        Log.d("PickViewModel", "Товар успешно снят из ячейки с учетом склада")
-                        _pickState.value = PickState.Success
-                    } else {
-                        Log.e("PickViewModel", "Ошибка снятия товара из ячейки с учетом склада: ${response.message}")
-                        _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки с учетом склада")
-                    }
+                if (response.success) {
+                    Log.d("PickViewModel", "Товар успешно снят из ячейки с учетом склада")
+                    _pickState.value = PickState.Success
+                } else {
+                    Log.e("PickViewModel", "Ошибка снятия товара из ячейки с учетом склада: ${response.message}")
+                    _pickState.value = PickState.Error(response.message ?: "Ошибка снятия товара из ячейки с учетом склада")
                 }
             } catch (e: Exception) {
                 Log.e("PickViewModel", "Исключение при снятии товара из ячейки с учетом склада: ${e.message}")

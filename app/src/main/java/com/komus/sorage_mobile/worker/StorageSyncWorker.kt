@@ -6,7 +6,6 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.komus.sorage_mobile.data.repository.StorageRepository
-import com.komus.sorage_mobile.data.repository.OfflinePlacementRepository
 import com.komus.sorage_mobile.data.repository.InventoryRepository
 import com.komus.sorage_mobile.util.NetworkUtils
 import dagger.assisted.Assisted
@@ -19,7 +18,6 @@ class StorageSyncWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
     private val storageRepository: StorageRepository,
-    private val offlinePlacementRepository: OfflinePlacementRepository,
     private val inventoryRepository: InventoryRepository,
     private val networkUtils: NetworkUtils
 ) : CoroutineWorker(context, workerParams) {
@@ -31,14 +29,9 @@ class StorageSyncWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         try {
-            val isNetworkAvailable = networkUtils.isNetworkAvailable()
-
-            if (isNetworkAvailable) {
-                // Синхронизация всех репозиториев
+            if (networkUtils.isNetworkAvailable()) {
                 syncStorageItems()
-                syncOfflinePlacements()
                 syncInventory()
-
                 return@withContext Result.success()
             } else {
                 Log.d(TAG, "Нет подключения к интернету, синхронизация отложена")
@@ -57,16 +50,6 @@ class StorageSyncWorker @AssistedInject constructor(
             Log.d(TAG, "Синхронизация storage items завершена успешно")
         } catch (e: Exception) {
             Log.e(TAG, "Ошибка при синхронизации storage items", e)
-        }
-    }
-
-    private suspend fun syncOfflinePlacements() {
-        try {
-            Log.d(TAG, "Начало синхронизации размещений")
-            offlinePlacementRepository.syncPendingPlacements()
-            Log.d(TAG, "Синхронизация размещений завершена успешно")
-        } catch (e: Exception) {
-            Log.e(TAG, "Ошибка при синхронизации размещений", e)
         }
     }
 

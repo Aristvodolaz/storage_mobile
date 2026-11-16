@@ -24,5 +24,6 @@ data class Units(
     @SerializedName("quantity") val quantity: Int,
     @SerializedName("productQnt") val productQnt: String,
     @SerializedName("conditionState") val conditionState: String,
-    @SerializedName("expirationDate") val expirationDate: String
+    @SerializedName("expirationDate") val expirationDate: String,
+    @SerializedName("name_wr_shk") val nameWrSHk: String
 )

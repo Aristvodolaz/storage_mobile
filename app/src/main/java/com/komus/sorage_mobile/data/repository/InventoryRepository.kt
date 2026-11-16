@@ -5,8 +5,8 @@ import com.komus.sorage_mobile.data.api.InventoryRequest
 import com.komus.sorage_mobile.data.db.dao.InventoryDao
 import com.komus.sorage_mobile.data.db.entity.InventoryEntity
 import com.komus.sorage_mobile.domain.model.InventoryItem
-import com.komus.sorage_mobile.util.NetworkUtils
-import com.komus.sorage_mobile.util.SPHelper
+import com.komus.sorage_mobile.util.UserSession
+
 import javax.inject.Inject
 import android.util.Log
 import com.komus.sorage_mobile.util.DateUtils.convertToIsoFormat
@@ -19,8 +19,7 @@ import javax.inject.Singleton
 class InventoryRepository @Inject constructor(
     private val api: StorageApi,
     private val dao: InventoryDao,
-    private val spHelper: SPHelper,
-    private val networkUtils: NetworkUtils
+    private val session: UserSession
 ) {
     companion object {
         private const val TAG = "InventoryRepository"
@@ -33,7 +32,7 @@ class InventoryRepository @Inject constructor(
         return if (true) {
             try {
                 // Пытаемся получить данные с сервера
-                val skladId = spHelper.getSkladId()
+                val skladId = session.getSkladId()
                 val response = api.getLocationItems(locationId, skladId.toInt())
 
                 if (!response.success) {
@@ -49,7 +48,7 @@ class InventoryRepository @Inject constructor(
                         name = product.name,
                         article = product.article,
                         barcode = product.shk,
-                        locationId = product.idSklad.toString(),
+                        locationId = locationId,  // код ячейки, а не склада: по нему строки находятся и обновляются
                         locationName = "",
                         expectedQuantity = actualQuantity,
                         actualQuantity = actualQuantity,
@@ -61,15 +60,17 @@ class InventoryRepository @Inject constructor(
                     )
                 }
 
-                // Сохраняем полученные данные в локальную базу
+                // Обновляем локальную базу, не трогая несинхронизированные правки инвентаризации
                 withContext(Dispatchers.IO) {
-                    dao.deleteItemsByLocationId(locationId)
-                    dao.insertItems(items.map {
-                        InventoryEntity.fromInventoryItem(it, spHelper.getUserName(), true)
+                    val unsyncedIds = dao.getUnsyncedItems().map { it.id }.toSet()
+                    dao.deleteSyncedItemsByLocationId(locationId)
+                    dao.insertItems(items.filter { it.id !in unsyncedIds }.map {
+                        InventoryEntity.fromInventoryItem(it, session.getUserName(), true)
                     })
                 }
 
-                items
+                // Возвращаем локальное состояние: в нём уже учтены несинхронизированные правки
+                dao.getItemsByLocationId(locationId).first().map { it.toInventoryItem() }
             } catch (e: Exception) {
                 Log.e(TAG, "Ошибка при получении данных с сервера: ${e.message}")
                 // В случае ошибки, возвращаем данные из локальной базы
@@ -95,7 +96,7 @@ class InventoryRepository @Inject constructor(
     suspend fun getIgetItemsByArticletemsBySku(sku: String): List<InventoryItem> {
         return if (true) {
             try {
-                val skladId = spHelper.getSkladId()
+                val skladId = session.getSkladId()
                 val response = api.getInventoryItemByArticle(sku, skladId)
 
                 if (!response.success) {
@@ -121,12 +122,13 @@ class InventoryRepository @Inject constructor(
                 }
 
                 withContext(Dispatchers.IO) {
-                    dao.insertItems(items.map {
-                        InventoryEntity.fromInventoryItem(it, spHelper.getUserName(), true)
+                    val unsyncedIds = dao.getUnsyncedItems().map { it.id }.toSet()
+                    dao.insertItems(items.filter { it.id !in unsyncedIds }.map {
+                        InventoryEntity.fromInventoryItem(it, session.getUserName(), true)
                     })
                 }
 
-                items
+                dao.getItemsByArticle(sku).first().map { it.toInventoryItem() }
             } catch (e: Exception) {
                 Log.e("InventoryRepository", "Ошибка при получении данных с сервера: ${e.message}")
                 dao.getItemsByArticle(sku).first().map { it.toInventoryItem() }
@@ -147,7 +149,7 @@ class InventoryRepository @Inject constructor(
      * Подтверждение товара без изменения количества
      */
     suspend fun confirmItem(item: InventoryItem): InventoryItem {
-        val userName = spHelper.getUserName()
+        val userName = session.getUserName()
         val inventoryEntity = InventoryEntity.fromInventoryItem(item, userName, false)
 
         // Сохраняем в локальную базу
@@ -189,7 +191,7 @@ class InventoryRepository @Inject constructor(
         newCondition: String,
         newReason: String?
     ): InventoryItem {
-        val userName = spHelper.getUserName()
+        val userName = session.getUserName()
         val updatedItem = item.copy(
             actualQuantity = newQuantity,
             expirationDate = newExpirationDate,
@@ -235,7 +237,7 @@ class InventoryRepository @Inject constructor(
 //        if (!networkUtils.isNetworkAvailable()) return
 
         val unsyncedItems = dao.getUnsyncedItems()
-        val userName = spHelper.getUserName()
+        val userName = session.getUserName()
 
         unsyncedItems.forEach { entity ->
             try {
@@ -299,7 +301,7 @@ class InventoryRepository @Inject constructor(
                         expirationDate = item.expirationDate,
                         conditionState = if (item.condition == "Кондиция") "кондиция" else "некондиция",
                         reason = item.reason ?: "",
-                        executor = spHelper.getUserName()
+                        executor = session.getUserName()
                     )
 
                     val response = api.confirmInventoryItem(request)
@@ -347,16 +349,13 @@ class InventoryRepository @Inject constructor(
                         expirationDate = convertToIsoFormat(item.expirationDate),
                         conditionState = if (item.condition == "Кондиция") "кондиция" else "некондиция",
                         reason = item.reason,
-                        executor = spHelper.getUserName()
+                        executor = session.getUserName()
                     )
                     
-                    // Здесь нужно адаптировать под реальное API
                     val response = api.confirmInventoryItem(request)
-                    
-                    // Проверяем успешность ответа (адаптируйте под реальный ответ API)
-                    val isSuccess = response != null
-                    
-                    if (isSuccess) {
+
+                    // Помечаем синхронизированным только при success=true, иначе запись останется в очереди
+                    if (response.success) {
                         // Помечаем как синхронизированные
                         dao.markInventoryAsSynced(item.id)
                         Log.d("InventoryRepository", "Инвентаризация синхронизирована: ${item.id}")

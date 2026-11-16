@@ -39,6 +39,9 @@ fun TopConnectionStatusBar(
             // Индикатор подключения
             ConnectionStatusIndicator(isConnected = isConnected)
 
+            // Очередь офлайн-операций и отклонённые сервером записи
+            OfflineQueueStatus()
+
             // Выбор склада
             WarehouseSelector(
                 currentWarehouse = currentWarehouse,

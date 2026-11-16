@@ -1,15 +1,16 @@
 package com.komus.sorage_mobile.presentation.screens.razmechenie
 
-import android.util.Log
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,75 +18,80 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.border
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.komus.scanner_module.ScannerViewModel
+import com.komus.sorage_mobile.data.model.ConditionReasons
 import com.komus.sorage_mobile.data.response.SearchItem
 import com.komus.sorage_mobile.domain.state.SearchState
+import com.komus.sorage_mobile.domain.viewModel.PlacementFlowViewModel
 import com.komus.sorage_mobile.domain.viewModel.SearchViewModel
 import com.komus.sorage_mobile.util.SPHelper
 
+/** Штрихкод — только цифры и не короче 8 символов; всё остальное считаем артикулом. */
+internal fun isBarcodeQuery(query: String): Boolean =
+    query.length >= 8 && query.all { it.isDigit() }
+
+/**
+ * Поиск товара для размещения.
+ * Скан запускает поиск сразу, без ручного нажатия. Один найденный товар открывается автоматически,
+ * заблокированный не открывается никогда. Остальные показываются списком с крупными строками для ТСД.
+ */
 @Composable
 fun SearchScreen(
     navController: NavController,
     scannerViewModel: ScannerViewModel = hiltViewModel(),
     searchViewModel: SearchViewModel = hiltViewModel(),
     spHelper: SPHelper,
+    placementFlow: PlacementFlowViewModel = hiltViewModel(),
     onScanClick: (String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
     val barcodeData by scannerViewModel.barcodeData.collectAsStateWithLifecycle()
     val searchState by searchViewModel.searchState.collectAsStateWithLifecycle()
-    var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
     var navigating by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
-    
-    // Сбрасываем состояние при входе на экран
+
+    fun runSearch(text: String) {
+        val value = text.trim()
+        if (value.isEmpty()) return
+        navigating = false
+        val isShk = isBarcodeQuery(value)
+        searchViewModel.search(shk = if (isShk) value else null, article = if (!isShk) value else null)
+    }
+
+    // Сброс при входе и фокус на поле ввода
     LaunchedEffect(Unit) {
         searchViewModel.resetState()
         navigating = false
-    }
-    
-    // Автофокус на поисковое поле при загрузке экрана
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
+        kotlinx.coroutines.delay(100)
         searchFocusRequester.requestFocus()
     }
 
-    // Автопоиск при сканировании
+    // Скан: подставляем код и сразу ищем
     LaunchedEffect(barcodeData) {
         if (barcodeData.isNotEmpty()) {
-            Log.d("SearchScreen", "Got barcode: $barcodeData")
-            query = barcodeData
-            // Не запускаем автоматический поиск, только обновляем поле ввода
+            query = barcodeData.trim()
             scannerViewModel.clearBarcode()
+            runSearch(query)
         }
     }
-    
-    // Обработка навигации при получении одного результата
+
+    // Один подходящий товар открываем сами; заблокированный — только показываем
     LaunchedEffect(searchState) {
-        if (searchState is SearchState.Success && !navigating) {
-            val results = (searchState as SearchState.Success).data
-            if (results.size == 1) {
+        val state = searchState
+        if (state is SearchState.Success && state.data.size == 1 && !navigating) {
+            val item = state.data.first()
+            if (!isBlocked(item)) {
                 navigating = true
-                selectedItem = results.first()
-                
-                // Сохраняем дополнительные данные о товаре
-                saveProductData(spHelper, selectedItem!!)
-                
-                navController.navigate("search_results/${selectedItem!!.ID}")
-                // Сбрасываем состояние после навигации
+                placementFlow.update { draftWithProduct(it, item) }
                 searchViewModel.resetState()
+                navController.navigate("search_results/${item.ID}")
             }
         }
     }
@@ -93,323 +99,202 @@ fun SearchScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        "Поиск товара",
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    ) 
+                title = {
+                    Text("Поиск товара", fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 backgroundColor = MaterialTheme.colors.primary,
                 contentColor = Color.White,
-                modifier = Modifier.height(44.dp)
+                modifier = Modifier.height(52.dp)
             )
         }
     ) { paddingValues ->
         Column(
             modifier = Modifier
+                .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            // Поле ввода и кнопка сканирования
-            Card(
+            // Поле ввода: крупный шрифт, очистка одним касанием
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                label = { Text("Артикул или штрихкод", fontSize = 13.sp) },
+                placeholder = { Text("Отсканируйте или введите", fontSize = 16.sp) },
+                singleLine = true,
+                textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = { query = "" }) {
+                            Icon(Icons.Default.Clear, contentDescription = "Очистить")
+                        }
+                    }
+                },
+                keyboardActions = KeyboardActions(onSearch = { runSearch(query) }),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                elevation = 2.dp,
-                shape = RoundedCornerShape(4.dp)
+                    .focusRequester(searchFocusRequester)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = { runSearch(query) },
+                enabled = query.isNotBlank() && searchState !is SearchState.Loading,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                colors = ButtonDefaults.buttonColors(
+                    backgroundColor = MaterialTheme.colors.primary,
+                    contentColor = Color.White
+                )
             ) {
-                Column(
-                    modifier = Modifier.padding(8.dp)
-                ) {
-                    Text(
-                        text = "Введите артикул или отсканируйте ШК",
-                        style = MaterialTheme.typography.caption,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        OutlinedTextField(
-                            value = query,
-                            onValueChange = { newValue -> 
-                                // Просто обновляем значение, без автоматического поиска
-                                query = newValue.trim() 
-                            },
-                            label = { 
-                                Text(
-                                    "Артикул/ШК",
-                                    fontSize = 10.sp
-                                )
-                            },
-                            singleLine = true,
-                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                            modifier = Modifier
-                                .weight(1f)
-                                .focusRequester(searchFocusRequester),
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Поиск",
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        )
-                        
-                        Spacer(modifier = Modifier.width(4.dp))
-                    
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Button(
-                        onClick = {
-                            if (query.isNotEmpty()) {
-                                val isShk = query.length > 10
-                                navigating = false
-                                searchViewModel.search(shk = if (isShk) query else null, article = if (!isShk) query else null)
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(36.dp),
-                        enabled = query.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = MaterialTheme.colors.primary,
-                            contentColor = Color.White
-                        )
-                    ) {
-                        Text(
-                            "ПОИСК",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
+                Text("НАЙТИ", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
 
-            when (searchState) {
-                is SearchState.Loading -> {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        elevation = 2.dp,
-                        shape = RoundedCornerShape(4.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    strokeWidth = 2.dp
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Поиск товара...",
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-                    }
-                }
-                is SearchState.Success -> {
-                    val results = (searchState as SearchState.Success).data
-                    if (results.size > 1) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            elevation = 2.dp,
-                            shape = RoundedCornerShape(4.dp),
-                            backgroundColor = Color(0xFFE8F5E9)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "Найдено товаров: ${results.size}",
-                                        style = MaterialTheme.typography.caption,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp,
-                                        color = Color(0xFF2E7D32)
-                                    )
-                                    
-                                    Text(
-                                        "Прокрутите для просмотра",
-                                        style = MaterialTheme.typography.caption,
-                                        fontSize = 10.sp,
-                                        color = Color(0xFF2E7D32),
-                                        textAlign = TextAlign.End
-                                    )
-                                }
-                                
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
-                                LazyColumn(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .heightIn(max = 400.dp)
-                                ) {
-                                    items(results) { item ->
-                                        Card(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(vertical = 4.dp)
-                                                .clickable {
-                                                    selectedItem = item
-                                                    navigating = true
-                                                    saveProductData(spHelper, item)
-                                                    navController.navigate("search_results/${selectedItem!!.ID}")
-                                                    searchViewModel.resetState()
-                                                },
-                                            elevation = 2.dp,
-                                            backgroundColor = Color.White,
-                                            shape = RoundedCornerShape(8.dp)
-                                        ) {
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .padding(8.dp),
-                                                horizontalArrangement = Arrangement.SpaceBetween,
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.weight(1f)
-                                                ) {
-                                                    Text(
-                                                        text = item.NAME ?: "Нет названия",
-                                                        fontSize = 12.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        maxLines = 2,
-                                                        overflow = TextOverflow.Ellipsis
-                                                    )
-                                                    
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    
-                                                    Row(
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = "Артикул: ${item.ARTICLE_ID_REAL}",
-                                                            fontSize = 10.sp,
-                                                            color = Color.Gray
-                                                        )
-                                                        
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        
-                                                        if (!item.SHK.isNullOrEmpty()) {
-                                                            Text(
-                                                                text = "ШК: ${item.SHK}",
-                                                                fontSize = 10.sp,
-                                                                color = Color.Gray
-                                                            )
-                                                        }
-                                                    }
+            Spacer(modifier = Modifier.height(12.dp))
 
-                                                }
-                                                
-                                                Icon(
-                                                    imageVector = Icons.Default.ArrowForward,
-                                                    contentDescription = "Выбрать",
-                                                    tint = MaterialTheme.colors.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                        }
+            when (val state = searchState) {
+                is SearchState.Idle -> StatusCard(
+                    text = "Отсканируйте штрихкод товара или введите артикул",
+                    background = Color(0xFFF5F5F5),
+                    textColor = Color.DarkGray
+                )
+                is SearchState.Loading -> Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Поиск товара…", fontSize = 14.sp)
+                }
+                is SearchState.Error -> StatusCard(
+                    text = state.message,
+                    background = Color(0xFFFFEBEE),
+                    textColor = MaterialTheme.colors.error
+                )
+                is SearchState.Success -> {
+                    if (state.data.size > 1) {
+                        Text(
+                            text = "Найдено: ${state.data.size}. Выберите товар",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            items(state.data) { item ->
+                                SearchResultCard(
+                                    item = item,
+                                    onClick = {
+                                        placementFlow.update { draftWithProduct(it, item) }
+                                        searchViewModel.resetState()
+                                        navController.navigate("search_results/${item.ID}")
                                     }
-                                }
-                            }
-                        }
-                    } else if (results.size == 1 && !navigating) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            elevation = 2.dp,
-                            shape = RoundedCornerShape(4.dp),
-                            backgroundColor = Color(0xFFE8F5E9)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Найден товар, переход...",
-                                    fontSize = 12.sp,
-                                    color = Color(0xFF2E7D32)
                                 )
                             }
                         }
                     }
                 }
-                is SearchState.Error -> {
-                    val errorMessage = (searchState as SearchState.Error).message
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        elevation = 2.dp,
-                        shape = RoundedCornerShape(4.dp),
-                        backgroundColor = Color(0xFFFFEBEE)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(8.dp)
-                        ) {
-                            Text(
-                                text = "Ошибка поиска",
-                                style = MaterialTheme.typography.caption,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colors.error
-                            )
-                            
-                            Spacer(modifier = Modifier.height(4.dp))
-                            
-                            Text(
-                                text = errorMessage,
-                                style = MaterialTheme.typography.caption,
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colors.error
-                            )
-                        }
-                    }
-                }
-                else -> {}
             }
         }
     }
 }
 
-// Функция для сохранения данных о товаре в SPHelper
-private fun saveProductData(spHelper: SPHelper, item: SearchItem) {
-    // Сохраняем артикул
-    spHelper.saveArticle(item.ARTICLE_ID_REAL)
-    
-    // Сохраняем штрихкод только если он не null
-    item.SHK?.let { shk ->
-        spHelper.saveShk(shk)
-    } ?: spHelper.saveShk("")  // If SHK is null, save empty string
-    
-    // Сохраняем название товара
-    spHelper.saveProductName(item.NAME)
+private fun isBlocked(item: SearchItem) = item.REASON == ConditionReasons.BLOCKED
+
+private fun draftWithProduct(
+    draft: com.komus.sorage_mobile.data.placement.PlacementDraft,
+    item: SearchItem
+) = draft.copy(
+    article = item.ARTICLE_ID_REAL,
+    shk = item.SHK ?: "",
+    productName = item.NAME
+)
+
+@Composable
+private fun StatusCard(text: String, background: Color, textColor: Color) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = 0.dp,
+        backgroundColor = background,
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Text(
+            text = text,
+            fontSize = 15.sp,
+            color = textColor,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        )
+    }
+}
+
+@Composable
+private fun SearchResultCard(item: SearchItem, onClick: () -> Unit) {
+    val blocked = isBlocked(item)
+    val uncertain = !blocked && item.CONDITION_STATE == "BAD"
+
+    val background = when {
+        blocked -> Color(0xFFFFEBEE)
+        uncertain -> Color(0xFFFFF8E1)
+        else -> Color.White
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clickable(enabled = !blocked, onClick = onClick),
+        elevation = if (blocked) 0.dp else 2.dp,
+        backgroundColor = background,
+        shape = RoundedCornerShape(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.NAME,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Арт. ${item.ARTICLE_ID_REAL}" + (item.SHK?.takeIf { it.isNotEmpty() }?.let { "  ШК $it" } ?: ""),
+                    fontSize = 13.sp,
+                    color = Color.DarkGray
+                )
+                Text(
+                    text = "В паллете: ${item.QNT_IN_PALLET}",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+                if (blocked) {
+                    Text(
+                        text = "Заблокирован: нельзя разместить",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colors.error
+                    )
+                } else if (uncertain) {
+                    Text(
+                        text = "Требует проверки состояния",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFF57C00)
+                    )
+                }
+            }
+            if (!blocked) {
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = "Выбрать",
+                    tint = MaterialTheme.colors.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+    }
 }

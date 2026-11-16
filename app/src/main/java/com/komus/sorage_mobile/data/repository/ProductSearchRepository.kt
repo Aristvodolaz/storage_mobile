@@ -1,17 +1,14 @@
 package com.komus.sorage_mobile.data.repository
 
 import android.util.Log
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.komus.sorage_mobile.data.api.StorageApi
-import com.komus.sorage_mobile.data.db.dao.InventoryDao
 import com.komus.sorage_mobile.data.db.dao.StorageDao
-import com.komus.sorage_mobile.data.model.StorageItem
-import com.komus.sorage_mobile.data.response.LocationProduct
+import com.komus.sorage_mobile.data.offline.ResponseCache
+import com.komus.sorage_mobile.data.response.EmptyCellsResponse
 import com.komus.sorage_mobile.data.response.LocationProductsResponse
 import com.komus.sorage_mobile.data.response.ProductInfo
 import com.komus.sorage_mobile.data.response.ProductInfoResponse
-import com.komus.sorage_mobile.data.response.ProductItem
-import com.komus.sorage_mobile.data.response.ProductLocation
+import com.komus.sorage_mobile.data.response.ProductSearchResponse
 import com.komus.sorage_mobile.util.NetworkUtils
 import com.komus.sorage_mobile.util.SPHelper
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +21,8 @@ class ProductSearchRepository @Inject constructor(
     private val api: StorageApi,
     private val dao: StorageDao,
     private val spHelper: SPHelper,
-    private val networkUtils: NetworkUtils
+    private val networkUtils: NetworkUtils,
+    private val cache: ResponseCache
 ) {
 
     suspend fun searchProducts(query: String): Flow<Result<List<ProductInfo>>> = flow {
@@ -32,26 +30,20 @@ class ProductSearchRepository @Inject constructor(
             val isShk = query.length > 7
             Log.d("ProductSearchRepository", "Поиск товаров: ${if (isShk) "ШК=$query" else "Артикул=$query"}")
 
-//            if (networkUtils.isNetworkAvailable()) {
-                // Если есть интернет, ищем через API
-                val apiResponse = withContext(Dispatchers.IO) {
-                    api.getProductDetails(
-                        shk = if (isShk) query else null,
-                        article = if (!isShk) query else null
-                    )
-                }
-                if (apiResponse.success) {
-                    Result.success(apiResponse.data) // Emit API response
-                } else {
-                    emit(Result.failure(Exception("Ошибка поиска товаров")))
-                }
-//            } else {
-//                // Если нет интернета, ищем в базе данных
-//                Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных")
-//                val localData = searchProductsFromDatabase(query)
-//                emit(Result.success(localData)) // Emit local data if no internet
-//            }
-
+            val shk = if (isShk) query else null
+            val article = if (!isShk) query else null
+            val apiResponse = cache.fetch(
+                key = "product-details:${shk.orEmpty()}:${article.orEmpty()}",
+                clazz = ProductSearchResponse::class.java,
+                isCacheable = { it.success }
+            ) {
+                withContext(Dispatchers.IO) { api.getProductDetails(shk = shk, article = article) }
+            }
+            if (apiResponse.success) {
+                emit(Result.success(apiResponse.data.map { it.toProductInfo() }))
+            } else {
+                emit(Result.failure(Exception("Ошибка поиска товаров")))
+            }
         } catch (e: Exception) {
             Log.e("ProductSearchRepository", "Исключение при поиске товаров: ${e.message}")
             emit(Result.failure(e))
@@ -59,132 +51,57 @@ class ProductSearchRepository @Inject constructor(
     }
 
     suspend fun getEmptyCells(skladId: Int): List<String> {
-        return if (true) {
-            val response = api.getEmptyCells(skladId)
-            if (response.success) {
-                response.data.cells.map { it.name }
-            } else {
-                emptyList()
-            }
-        } else {
-            emptyList()
+        val response = cache.fetch(
+            key = "empty-cells:$skladId",
+            clazz = EmptyCellsResponse::class.java,
+            isCacheable = { it.success }
+        ) {
+            api.getEmptyCells(skladId)
         }
+        return if (response.success) response.data.cells.map { it.name } else emptyList()
     }
-
-    private suspend fun searchProductsFromDatabase(query: String): List<ProductInfo> {
-        val storageItems = if (query.length > 7) {
-            dao.findItemsByShk(query)
-        } else {
-            dao.findItemsByArticle(query)
-        }
-
-        return storageItems.map { storageItemEntity ->
-            ProductInfo(
-                id = storageItemEntity.id,
-                name = storageItemEntity.name,
-                shk = storageItemEntity.shk,
-                article = storageItemEntity.article,
-                totalQuantity = storageItemEntity.productQnt,
-                items = listOf(
-                    ProductLocation(
-                        id = storageItemEntity.id,
-                        name_wr = storageItemEntity.wrShk,
-                        quantity = storageItemEntity.placeQnt,
-                        conditionState = storageItemEntity.conditionState,
-                        expirationDate = storageItemEntity.expirationDate,
-                        productQnt = storageItemEntity.productQnt
-                    )
-                )
-            )
-        }
-}
-
-
 
     suspend fun searchProductsByLocationId(locationId: String): LocationProductsResponse {
         val skladId = spHelper.getSkladId()
-
-        return api.getLocationProducts(locationId = locationId, skladId = skladId.toInt())
+        return cache.fetch(
+            key = "location-products:$locationId:$skladId",
+            clazz = LocationProductsResponse::class.java,
+            isCacheable = { it.success }
+        ) {
+            api.getLocationProducts(locationId = locationId, skladId = skladId.toInt())
+        }
     }
 
     suspend fun searchProductsByLocationName(locationName: String): LocationProductsResponse {
         val skladId = spHelper.getSkladId()
-
-        return api.getLocationProducts(locationId = locationName, skladId = skladId.toInt())
-//        } else {
-//            // If no network, query from the local database
-//            Log.d("ProductSearchRepository", "Нет интернета, ищем в локальной базе данных по locationName")
-////            val localData = searchLocationProductsFromDatabase(locationName)
-//            // Assuming you want to return a response in the same format as the API response
-////            LocationProductsResponse(success = true, data = localData, message = null)
-//        }
+        return cache.fetch(
+            key = "location-products:$locationName:$skladId",
+            clazz = LocationProductsResponse::class.java,
+            isCacheable = { it.success }
+        ) {
+            api.getLocationProducts(locationId = locationName, skladId = skladId.toInt())
+        }
     }
 
     suspend fun searchProductsByArticle(article: String): ProductInfoResponse {
         val skladId = spHelper.getSkladId()
-
-        return api.getProductInfo(article = article, skladId = skladId.toInt())
+        return cache.fetch(
+            key = "product-info:article:$article:$skladId",
+            clazz = ProductInfoResponse::class.java,
+            isCacheable = { it.success }
+        ) {
+            api.getProductInfo(article = article, skladId = skladId.toInt())
+        }
     }
 
     suspend fun searchProductsByBarcode(barcode: String): ProductInfoResponse {
         val skladId = spHelper.getSkladId()
-
-        return api.getProductInfo(shk = barcode, skladId = skladId.toInt())
-
-    }
-
-//    private suspend fun searchLocationProductsFromDatabase(locationId: String): List<LocationProduct> {
-        // Query from the database by locationId
-//        val storageItems = dao.findItemsByShk(locationId)
-//        return storageItems.map { storageItemEntity ->
-//            LocationProduct(
-//                id = storageItemEntity.id,
-//                locationId = storageItemEntity.wrShk, // Example, adjust if needed
-//                quantity = storageItemEntity.placeQnt,
-//                conditionState = storageItemEntity.conditionState,
-//                expirationDate = storageItemEntity.expirationDate,
-//                shk = storageItemEntity.shk,
-//                name = storageItemEntity.name,
-//                article = storageItemEntity.article,
-//                productQnt = storageItemEntity.productQnt
-//            )
-//        }
-//    }
-
-    private suspend fun searchProductInfoFromDatabase(query: String): ProductInfo {
-        // Query from the database by article or barcode
-        val storageItems = if (query.length > 7) {
-            dao.findItemsByShk(query)
-        } else {
-            dao.findItemsByArticle(query)
+        return cache.fetch(
+            key = "product-info:shk:$barcode:$skladId",
+            clazz = ProductInfoResponse::class.java,
+            isCacheable = { it.success }
+        ) {
+            api.getProductInfo(shk = barcode, skladId = skladId.toInt())
         }
-
-        // If the list is empty, return a default ProductInfo or throw a custom exception
-        if (storageItems.isEmpty()) {
-            Log.e("ProductSearchRepository", "No products found for query: $query")
-            throw NoSuchElementException("No products found for query: $query")
-        }
-
-        // Now it's safe to access the first item
-        return ProductInfo(
-            id = storageItems.first().id,
-            name = storageItems.first().name,
-            shk = storageItems.first().shk,
-            article = storageItems.first().article,
-            totalQuantity = storageItems.first().productQnt,
-            items = storageItems.map { storageItemEntity ->
-                ProductLocation(
-                    id = storageItemEntity.id,
-                    name_wr = storageItemEntity.wrShk,
-                    quantity = storageItemEntity.placeQnt,
-                    conditionState = storageItemEntity.conditionState,
-                    expirationDate = storageItemEntity.expirationDate,
-                    productQnt = storageItemEntity.productQnt
-                )
-            }
-        )
     }
-
-
-
 }

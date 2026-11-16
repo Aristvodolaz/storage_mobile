@@ -9,6 +9,7 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.komus.sorage_mobile.worker.OfflineQueueWorker
 import com.komus.sorage_mobile.worker.StorageSyncWorker
 import com.komus.sorage_mobile.worker.StorageWorkerFactory
 import dagger.hilt.android.HiltAndroidApp
@@ -25,6 +26,7 @@ class StorageApp : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         setupStorageSync()
+        OfflineQueueWorker.schedulePeriodic(this)
     }
 
     // Use the workManagerConfiguration property instead of getWorkManagerConfiguration method

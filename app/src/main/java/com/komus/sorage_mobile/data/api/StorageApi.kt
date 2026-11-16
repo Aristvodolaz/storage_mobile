@@ -20,8 +20,10 @@ import com.komus.sorage_mobile.data.response.UpdateInventoryRequest
 import com.komus.sorage_mobile.data.response.SyncInventoryRequest
 import com.komus.sorage_mobile.data.model.StorageResponse
 import com.komus.sorage_mobile.data.response.EmptyCellsResponse
+import com.komus.sorage_mobile.data.response.LocationDetailsResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -49,7 +51,8 @@ interface StorageApi {
     @POST("/api/storage/{productId}/buffer/move")
     suspend fun moveProduct(
         @Path("productId") productId: String,
-        @Body request: MoveProductRequest
+        @Body request: MoveProductRequest,
+        @Header("Idempotency-Key") idempotencyKey: String
     ): BaseResponse
     
     @GET("/api/storage/location-items/{locationId}")
@@ -61,7 +64,8 @@ interface StorageApi {
     @POST("/api/storage/{productId}/location/pick")
     suspend fun pickProduct(
         @Path("productId") productId: String,
-        @Body request: PickRequest
+        @Body request: PickRequest,
+        @Header("Idempotency-Key") idempotencyKey: String
     ): BaseResponse
     
     @GET("/api/storage/item/details")
@@ -73,17 +77,20 @@ interface StorageApi {
     @POST("/api/storage/{productId}/buffer")
     suspend fun placeProductToBuffer(
         @Path("productId") productId: String,
-        @Body request: PlaceProductRequest
+        @Body request: PlaceProductRequest,
+        @Header("Idempotency-Key") idempotencyKey: String
     ): BaseResponse
     
     @POST("/api/storage/pick-from-location")
     suspend fun pickFromLocation(
-        @Body request: PickFromLocationRequest
+        @Body request: PickFromLocationRequest,
+        @Header("Idempotency-Key") idempotencyKey: String
     ): BaseResponse
     
     @POST("/api/storage/pick-from-location-by-sklad-id")
     suspend fun pickFromLocationBySkladId(
-        @Body request: PickFromLocationRequest
+        @Body request: PickFromLocationRequest,
+        @Header("Idempotency-Key") idempotencyKey: String
     ): BaseResponse
 
     @GET("/api/storage/inventory/location/{locationId}")
@@ -128,6 +135,12 @@ interface StorageApi {
     suspend fun getEmptyCells(
         @Query("id_sklad") skladId: Int
     ): EmptyCellsResponse
+
+    @GET("/api/storage/location/{locationId}/details")
+    suspend fun getLocationDetails(
+        @Path("locationId") locationId: String,
+        @Query("sklad_id") skladId: String? = null
+    ): LocationDetailsResponse
 
     @GET("api/storage/article-info")
     suspend fun searchProductByArticleOrBarcode(

@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.runtime.*
@@ -50,6 +51,19 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 private const val TAG = "ScanSourceLocationScreen"
+
+/** Тип ЕХ паллета для учёта занимаемых адресов при сканировании ячейки */
+enum class ExPalletType(
+    val displayName: String,
+    val addressesCount: Int,
+    val description: String
+) {
+    EURO("Евро", 1, "1 адрес – выбранный"),
+    FIN("FIN", 1, "1 адрес – выбранный"),
+    EURO_X2("Евро*2", 2, "2 адреса – выбранный + рядом"),
+    FIN_X2("FIN*2", 3, "3 адреса – выбранный + 2 рядом")
+}
+
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ScanSourceLocationScreen(
@@ -72,11 +86,16 @@ fun ScanSourceLocationScreen(
 
     var moveQuantity by remember { mutableStateOf(0) }
     var targetLocation by remember { mutableStateOf("") }
+    var selectedExPalletType by remember { mutableStateOf<ExPalletType?>(null) }
 
     // Новое состояние для успешного диалога
     var showSuccessDialog by remember { mutableStateOf(false) }
     var successMessage by remember { mutableStateOf("") }
     val locationFocusRequester = remember { FocusRequester() }
+    
+    // Состояние для предупреждения о занятом адресе
+    var showAddressWarningDialog by remember { mutableStateOf(false) }
+    var addressWarningMessage by remember { mutableStateOf("") }
 
     // Обновление данных при возврате на экран
     LaunchedEffect(Unit) {
@@ -227,8 +246,9 @@ fun ScanSourceLocationScreen(
     if (showQuantityDialog && selectedItem != null) {
         CompactQuantityDialog(
             item = selectedItem!!,
-            onConfirm = { quantity ->
+            onConfirm = { quantity, exPalletType ->
                 moveQuantity = quantity
+                selectedExPalletType = exPalletType
                 showQuantityDialog = false
                 showExpirationAndConditionDialog = true
             },
@@ -259,6 +279,20 @@ fun ScanSourceLocationScreen(
                 targetLocation = location
                 movementViewModel.setTargetLocation(targetLocation)
                 showTargetLocationDialog = false
+                
+                // Проверяем, является ли перемещаемый товар ЕХ паллетом
+                val isExPallet = selectedItem?.units?.any { unit ->
+                    unit.prunitName.contains("ЕХ", ignoreCase = true) || 
+                    unit.prunitName.contains("EX", ignoreCase = true)
+                } ?: false
+                
+                if (isExPallet) {
+                    // Показываем предупреждение для ЕХ паллет
+                    addressWarningMessage = "Внимание! Вы перемещаете ЕХ паллет в ячейку $location. Убедитесь, что в ячейке не более 2-х ЕХ паллет."
+                    showAddressWarningDialog = true
+                }
+                
+                // Выполняем перемещение в любом случае
                 movementViewModel.moveProduct()
             },
             onDismiss = { showTargetLocationDialog = false },
@@ -332,6 +366,50 @@ fun ScanSourceLocationScreen(
                         showSuccessDialog = false
                         navController.popBackStack()
                     }
+                ) {
+                    Text("ОК", fontSize = 14.sp)
+                }
+            },
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+    
+    // Диалог предупреждения о занятом адресе
+    if (showAddressWarningDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddressWarningDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Предупреждение",
+                        tint = Color(0xFFFF9800),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "Предупреждение",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = Color(0xFFFF9800)
+                    )
+                }
+            },
+            text = {
+                Text(
+                    text = addressWarningMessage,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showAddressWarningDialog = false },
+                    colors = ButtonDefaults.buttonColors(
+                        backgroundColor = Color(0xFFFF9800),
+                        contentColor = Color.White
+                    )
                 ) {
                     Text("ОК", fontSize = 14.sp)
                 }
@@ -598,7 +676,7 @@ fun ExpirationAndConditionDialog(
 @Composable
 fun CompactQuantityDialog(
     item: LocationItem,
-    onConfirm: (Int) -> Unit,
+    onConfirm: (Int, ExPalletType?) -> Unit,
     onDismiss: () -> Unit
 ) {
     var quantity by remember { mutableStateOf("") }
@@ -607,6 +685,11 @@ fun CompactQuantityDialog(
     val availableExQuantity = availableQuantity / productQnt
     var errorMessage by remember { mutableStateOf<String?>(null) }
     val quantityFocusRequester = remember { FocusRequester() }
+    
+    val isExPallet = item.units.any { unit ->
+        unit.prunitName.contains("ЕХ", ignoreCase = true) || unit.prunitName.contains("EX", ignoreCase = true)
+    }
+    var selectedExPalletType by remember { mutableStateOf(ExPalletType.EURO) }
     
     // Автофокус на поле количества при открытии диалога
     LaunchedEffect(Unit) {
@@ -624,7 +707,11 @@ fun CompactQuantityDialog(
             ) 
         },
         text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
                 Text(
                     text = item.name, 
                     fontWeight = FontWeight.Medium,
@@ -634,7 +721,8 @@ fun CompactQuantityDialog(
                 )
 
                 Text(
-                    text = "Доступное количество EX: $availableExQuantity \nОбщее кол-во: $availableQuantity\nВложенность ЕХ: $productQnt"
+                    text = "Доступное количество EX: $availableExQuantity \nОбщее кол-во: $availableQuantity\nВложенность ЕХ: $productQnt",
+                    fontSize = 12.sp
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -646,7 +734,6 @@ fun CompactQuantityDialog(
                             quantity = it
                             errorMessage = null
                             
-                            // Проверяем количество при вводе
                             val quantityInt = it.toIntOrNull() ?: 0
                             if (quantityInt > availableExQuantity) {
                                 errorMessage = "Максимум: $availableExQuantity EX"
@@ -671,6 +758,53 @@ fun CompactQuantityDialog(
                         modifier = Modifier.padding(start = 4.dp, top = 2.dp)
                     )
                 }
+                
+                if (isExPallet) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Тип ЕХ паллет (для учёта пустых ячеек)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    ExPalletType.entries.forEach { type ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .clickable { selectedExPalletType = type }
+                                .background(
+                                    if (selectedExPalletType == type) Primary.copy(alpha = 0.15f)
+                                    else Color.Transparent,
+                                    RoundedCornerShape(4.dp)
+                                )
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedExPalletType == type,
+                                onClick = { selectedExPalletType = type },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Primary,
+                                    unselectedColor = Color.DarkGray
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = type.displayName,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Text(
+                                    text = type.description,
+                                    fontSize = 11.sp,
+                                    color = Color.DarkGray
+                                )
+                            }
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -682,8 +816,8 @@ fun CompactQuantityDialog(
                     } else if (quantityInt > availableExQuantity) {
                         errorMessage = "Максимум: $availableExQuantity EX"
                     } else {
-                        // Умножаем на productQnt для получения общего количества
-                        onConfirm(quantityInt * productQnt)
+                        val exType = if (isExPallet) selectedExPalletType else null
+                        onConfirm(quantityInt * productQnt, exType)
                     }
                 },
                 enabled = quantity.isNotEmpty()

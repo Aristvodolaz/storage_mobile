@@ -1,8 +1,7 @@
 package com.komus.sorage_mobile.di
 
+import com.komus.sorage_mobile.data.offline.OfflineQueue
 import com.komus.sorage_mobile.data.repository.InventoryRepository
-import com.komus.sorage_mobile.data.repository.OfflinePlacementRepository
-import com.komus.sorage_mobile.data.repository.PlacementRepository
 import com.komus.sorage_mobile.data.repository.StorageRepository
 import com.komus.sorage_mobile.util.NetworkUtils
 import com.komus.sorage_mobile.worker.StorageWorkerFactory
@@ -20,17 +19,10 @@ object WorkerModule {
     @Singleton
     fun provideWorkerFactory(
         storageRepository: StorageRepository,
-        placementRepository: PlacementRepository,
-        offlinePlacementRepository: OfflinePlacementRepository,
         inventoryRepository: InventoryRepository,
-        networkUtils: NetworkUtils
+        networkUtils: NetworkUtils,
+        offlineQueue: OfflineQueue
     ): StorageWorkerFactory {
-        return StorageWorkerFactory(
-            storageRepository,
-            placementRepository,
-            offlinePlacementRepository,
-            inventoryRepository,
-            networkUtils
-        )
+        return StorageWorkerFactory(storageRepository, inventoryRepository, networkUtils, offlineQueue)
     }
 }

@@ -15,7 +15,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.*
-import com.komus.sorage_mobile.presentation.screens.razmechenie.ProductInfoScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.ScanBufferLocationScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.SearchScreen
 import com.komus.sorage_mobile.presentation.screens.razmechenie.UnitSelectionScreen
@@ -39,7 +38,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.komus.scanner_module.ScannerViewModel
 import com.komus.sorage_mobile.presentation.components.TopConnectionStatusBar
-import com.komus.sorage_mobile.util.NetworkUtils
 import kotlinx.coroutines.flow.collectLatest
 
 object Routes {
@@ -49,8 +47,7 @@ object Routes {
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun MainScreen(spHelper: SPHelper,
-               scannerViewModel: ScannerViewModel,
-               networkUtils: NetworkUtils = hiltViewModel() ) {
+               scannerViewModel: ScannerViewModel) {
     val navController = rememberNavController()
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
@@ -83,7 +80,7 @@ fun MainScreen(spHelper: SPHelper,
             // Отключаем встроенные отступы Scaffold
             contentWindowInsets = WindowInsets(0, 0, 0, 0)
         ) { paddingValues ->
-            NavigationGraph(navController, paddingValues, scannerViewModel, spHelper, networkUtils)
+            NavigationGraph(navController, paddingValues, scannerViewModel, spHelper)
         }
     }
 }
@@ -125,17 +122,8 @@ fun NavigationGraph(
     navController: NavHostController,
     paddingValues: PaddingValues,
     scannerViewModel: ScannerViewModel,
-    spHelper: SPHelper,
-    networkUtils: NetworkUtils
+    spHelper: SPHelper
 ) {
-
-    var isOnline by rememberSaveable { mutableStateOf(networkUtils.isNetworkAvailable()) }
-
-    LaunchedEffect(Unit) {
-        networkUtils.observeNetworkState().collectLatest { isNetworkAvailable ->
-            isOnline = isNetworkAvailable
-        }
-    }
 
 
     // Учитываем paddingValues для отступов контента от верхней и нижней части экрана
@@ -191,9 +179,6 @@ fun NavigationGraph(
                 UnitSelectionScreen(navController, productId =  query, spHelper = spHelper)
             }
 
-            composable("product_info") {
-                ProductInfoScreen(navController, spHelper = spHelper)
-            }
             
 
             

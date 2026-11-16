@@ -1,131 +1,88 @@
 package com.komus.sorage_mobile.domain.viewModel
 
-import android.os.Build
-import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.komus.sorage_mobile.domain.model.NonConformityReason
+import com.komus.sorage_mobile.data.placement.PlacementDraftStore
 import com.komus.sorage_mobile.domain.util.ExpirationDateValidator
-import com.komus.sorage_mobile.util.DateUtils
-import com.komus.sorage_mobile.util.ProductMovementHelper
-import com.komus.sorage_mobile.util.SPHelper
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
-import timber.log.Timber
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import javax.inject.Inject
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
+/** Срок «без ограничения» хранится как 2999-01-01, как и раньше. */
+const val NO_EXPIRATION_ISO = "2999-01-01"
 
 @HiltViewModel
 class ExpirationDateViewModel @Inject constructor(
-    private val spHelper: SPHelper
+    private val draftStore: PlacementDraftStore
 ) : ViewModel() {
 
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage
+    private val displayFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 
-    private val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-
-    @RequiresApi(Build.VERSION_CODES.O)
+    /** Дата окончания срока в формате дд.мм.гггг или пустая строка, если данных недостаточно или они некорректны. */
+    @RequiresApi(android.os.Build.VERSION_CODES.O)
     fun calculateEndDate(startDate: String, days: String, months: String): String {
+        val start = parseDisplayDate(startDate) ?: return ""
+        if (days.isEmpty() && months.isEmpty()) return ""
         return try {
-            val start = LocalDate.parse(startDate, dateFormatter)
             var end = start
-
-            if (days.isNotEmpty()) {
-                end = end.plusDays(days.toLong())
-            }
-            
-            if (months.isNotEmpty()) {
-                end = end.plusMonths(months.toLong())
-            }
-
-            end.format(dateFormatter)
-        } catch (e: Exception) {
-            Log.e("ExpirationDateViewModel", "Ошибка расчета даты: ${e.message}")
+            if (days.isNotEmpty()) end = end.plusDays(days.toLong())
+            if (months.isNotEmpty()) end = end.plusMonths(months.toLong())
+            end.format(displayFormat)
+        } catch (e: NumberFormatException) {
             ""
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    fun saveExpirationData(
+    /**
+     * Проверяет данные шага срока годности и записывает их в черновик.
+     * @return null, если всё верно и черновик обновлён; иначе текст ошибки для оператора.
+     */
+    @RequiresApi(android.os.Build.VERSION_CODES.O)
+    fun save(
+        skipExpiration: Boolean,
         startDate: String,
         days: String,
         months: String,
         condition: String,
-        reason: String? = null
-    ) {
-        viewModelScope.launch {
-            try {
-                val localDate = calculateEndDate(startDate, days, months)
-                if (localDate.isEmpty()) {
-                    _errorMessage.value = "Ошибка расчета даты"
-                    return@launch
-                }
-                
-                Timber.d("Расчитанная дата окончания срока годности (локальный формат): $localDate")
-                
-                // Преобразуем в ISO формат перед сохранением
-                val isoDate = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // Используем LocalDate для Android 8.0+
-                    val date = LocalDate.parse(localDate, dateFormatter)
-                    date.format(DateTimeFormatter.ISO_DATE)
-                } else {
-                    // Используем DateUtils для старых версий Android
-                    DateUtils.convertToIsoFormat(localDate)
-                }
-                
-                if (isoDate.isEmpty()) {
-                    _errorMessage.value = "Ошибка преобразования даты"
-                    return@launch
-                }
-                
-                Timber.d("ISO формат даты для сохранения: $isoDate")
-                
-                // Валидируем дату перед сохранением с помощью ProductMovementHelper
-                val validatedIsoDate = ProductMovementHelper.processExpirationDate(isoDate)
-                Timber.d("Итоговый ISO формат даты: $validatedIsoDate")
-
-                // Проверяем валидность срока годности для указанного состояния
-                // Разрешаем сохранение для некондиции даже с истекшим сроком
-                if (ExpirationDateValidator.isExpired(validatedIsoDate) && condition == "Кондиция") {
-                    _errorMessage.value = "Невозможно установить состояние 'Кондиция' для товара с истекшим сроком годности"
-                    return@launch
-                }
-                
-                // Проверяем, что для некондиции указана валидная причина
-                if (condition == "Некондиция" && reason.isNullOrEmpty()) {
-                        _errorMessage.value = "Для некондиции необходимо указать причину"
-                        return@launch
-                }
-
-                Log.d("DATE", validatedIsoDate)
-                Log.d("condition", condition)
-
-                // Сохраняем все данные
-                spHelper.saveSrokGodnosti(validatedIsoDate)
-                spHelper.saveCondition(condition)
-                
-                // Сохраняем причину некондиции если она указана
-                if (condition == "Некондиция" && !reason.isNullOrEmpty()) {
-                    spHelper.saveReason(reason)
-                }
-                
-                _errorMessage.value = null
-            } catch (e: Exception) {
-                Timber.e(e, "Ошибка при сохранении данных о сроке годности")
-                _errorMessage.value = "Ошибка при сохранении данных: ${e.message}"
-            }
+        reason: String
+    ): String? {
+        if (condition == "Некондиция" && reason.isBlank()) {
+            return "Укажите причину некондиции"
         }
+
+        val expirationIso = if (skipExpiration) {
+            NO_EXPIRATION_ISO
+        } else {
+            val endDisplay = calculateEndDate(startDate, days, months)
+            if (parseDisplayDate(startDate) == null) {
+                return "Введите дату производства в формате дд.мм.гггг"
+            }
+            if (endDisplay.isEmpty()) {
+                return "Укажите срок хранения: дни или месяцы"
+            }
+            LocalDate.parse(endDisplay, displayFormat).toString()
+        }
+
+        if (condition == "Кондиция" && ExpirationDateValidator.isExpired(expirationIso)) {
+            return "Нельзя установить «Кондиция» для товара с истекшим сроком годности"
+        }
+
+        draftStore.update {
+            it.copy(
+                expirationDate = expirationIso,
+                condition = condition,
+                reason = if (condition == "Некондиция") reason else ""
+            )
+        }
+        return null
     }
-    
-    fun clearError() {
-        _errorMessage.value = null
-    }
+
+    private fun parseDisplayDate(text: String): LocalDate? =
+        try {
+            if (text.length == 10) LocalDate.parse(text, displayFormat) else null
+        } catch (e: DateTimeParseException) {
+            null
+        }
 }

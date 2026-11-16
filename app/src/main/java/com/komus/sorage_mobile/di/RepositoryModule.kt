@@ -2,9 +2,10 @@ package com.komus.sorage_mobile.di
 
 import com.komus.sorage_mobile.data.api.AuthApi
 import com.komus.sorage_mobile.data.api.StorageApi
-import com.komus.sorage_mobile.data.db.AppDatabase
 import com.komus.sorage_mobile.data.db.dao.InventoryDao
 import com.komus.sorage_mobile.data.db.dao.PlacementDao
+import com.komus.sorage_mobile.data.offline.OfflineQueue
+import com.komus.sorage_mobile.data.offline.ResponseCache
 import com.komus.sorage_mobile.data.repository.InventoryRepository
 import com.komus.sorage_mobile.data.repository.MovementRepository
 import com.komus.sorage_mobile.data.repository.PickRepository
@@ -14,8 +15,6 @@ import com.komus.sorage_mobile.domain.repository.AuthRepository
 import com.komus.sorage_mobile.domain.repository.SearchRepository
 import com.komus.sorage_mobile.util.NetworkUtils
 import com.komus.sorage_mobile.util.SPHelper
-import com.komus.sorage_mobile.data.repository.OfflinePlacementRepository
-import com.komus.sorage_mobile.data.db.dao.OfflinePlacementDao
 import com.komus.sorage_mobile.data.db.dao.StorageDao
 import dagger.Module
 import dagger.Provides
@@ -29,36 +28,45 @@ object RepositoryModule {
 
     @Provides
     @Singleton
-    fun provideAuthRepository(apiService: AuthApi): AuthRepository {
-        return AuthRepository(apiService)
+    fun provideAuthRepository(apiService: AuthApi, cache: ResponseCache): AuthRepository {
+        return AuthRepository(apiService, cache)
     }
 
     @Provides
     @Singleton
-    fun provideMovementRepository(apiService: StorageApi, spHelper: SPHelper): MovementRepository {
-        return MovementRepository(apiService, spHelper)
-    }
-    
-    @Provides
-    @Singleton
-    fun providePickRepository(apiService: StorageApi): PickRepository {
-        return PickRepository(apiService)
+    fun provideMovementRepository(
+        apiService: StorageApi,
+        spHelper: SPHelper,
+        offlineQueue: OfflineQueue,
+        cache: ResponseCache
+    ): MovementRepository {
+        return MovementRepository(apiService, spHelper, offlineQueue, cache)
     }
 
-    
     @Provides
     @Singleton
-    fun provideSearchRepository(apiService: StorageApi): SearchRepository {
-        return SearchRepository(apiService)
+    fun providePickRepository(
+        apiService: StorageApi,
+        offlineQueue: OfflineQueue,
+        cache: ResponseCache
+    ): PickRepository {
+        return PickRepository(apiService, offlineQueue, cache)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSearchRepository(apiService: StorageApi, cache: ResponseCache): SearchRepository {
+        return SearchRepository(apiService, cache)
     }
 
     @Provides
     @Singleton
     fun providePlacementRepository(
         api: StorageApi,
-        placementDao: PlacementDao
+        placementDao: PlacementDao,
+        offlineQueue: OfflineQueue
     ): PlacementRepository {
-        return PlacementRepository(api, placementDao)
+        return PlacementRepository(api, placementDao, offlineQueue)
     }
 
     @Provides
@@ -66,29 +74,21 @@ object RepositoryModule {
     fun provideInventoryRepository(
         api: StorageApi,
         dao: InventoryDao,
-        spHelper: SPHelper,
-        networkUtils: NetworkUtils
+        spHelper: SPHelper
     ): InventoryRepository {
-        return InventoryRepository(api, dao, spHelper, networkUtils)
+        return InventoryRepository(api, dao, spHelper)
     }
+
     @Provides
     @Singleton
     fun provideProductSearchRepository(
         api: StorageApi,
         dao: StorageDao,
         spHelper: SPHelper,
-        networkUtils: NetworkUtils
-    ): ProductSearchRepository {
-        return ProductSearchRepository(api, dao, spHelper, networkUtils)
-    }
-    @Provides
-    @Singleton
-    fun provideOfflinePlacementRepository(
-        offlinePlacementDao: OfflinePlacementDao,
-        storageApi: StorageApi,
         networkUtils: NetworkUtils,
-        spHelper: SPHelper
-    ): OfflinePlacementRepository {
-        return OfflinePlacementRepository(offlinePlacementDao, storageApi, networkUtils, spHelper)
+        cache: ResponseCache
+    ): ProductSearchRepository {
+        return ProductSearchRepository(api, dao, spHelper, networkUtils, cache)
     }
+
 }

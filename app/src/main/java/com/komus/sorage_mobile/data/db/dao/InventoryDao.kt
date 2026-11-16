@@ -31,6 +31,10 @@ interface InventoryDao {
     @Query("DELETE FROM inventory WHERE cell_id = :locationId")
     suspend fun deleteItemsByLocationId(locationId: String): Int
 
+    // Только уже отправленные: несинхронизированные правки инвентаризации удалять нельзя
+    @Query("DELETE FROM inventory WHERE cell_id = :locationId AND isSynced = 1")
+    suspend fun deleteSyncedItemsByLocationId(locationId: String): Int
+
     @Query("DELETE FROM inventory WHERE isSynced = 1")
     suspend fun deleteSyncedItems(): Int
 

@@ -2,6 +2,9 @@ package com.komus.sorage_mobile.data.repository
 
 import android.util.Log
 import com.komus.sorage_mobile.data.api.StorageApi
+import com.komus.sorage_mobile.data.offline.OfflineOpType
+import com.komus.sorage_mobile.data.offline.OfflineQueue
+import com.komus.sorage_mobile.data.offline.ResponseCache
 import com.komus.sorage_mobile.data.request.MoveProductRequest
 import com.komus.sorage_mobile.data.request.PickFromLocationRequest
 import com.komus.sorage_mobile.data.request.PickRequest
@@ -17,15 +20,21 @@ import timber.log.Timber
 import javax.inject.Inject
 
 class PickRepository @Inject constructor(
-    private val api: StorageApi
+    private val api: StorageApi,
+    private val offlineQueue: OfflineQueue,
+    private val cache: ResponseCache
 ) {
-    suspend fun getLocationItems(locationId: String, sklad:String): Flow<Result<List<LocationItem>>> = flow {
+    suspend fun getLocationItems(locationId: String, sklad: String): Flow<Result<List<LocationItem>>> = flow {
         try {
             Log.d("PickRepository", "Запрос товаров в ячейке: $locationId")
-            val response = withContext(Dispatchers.IO) {
-                api.getLocationItems(locationId, sklad)
+            val response = cache.fetch(
+                key = "location-items:$locationId:$sklad",
+                clazz = LocationItemsResponse::class.java,
+                isCacheable = { it.success }
+            ) {
+                withContext(Dispatchers.IO) { api.getLocationItems(locationId, sklad) }
             }
-            
+
             if (response.success) {
                 Log.d("PickRepository", "Получено ${response.data.size} товаров в ячейке")
                 emit(Result.success(response.data))
@@ -38,7 +47,7 @@ class PickRepository @Inject constructor(
             emit(Result.failure(e))
         }
     }
-    
+
     suspend fun pickProduct(
         productId: String,
         locationId: String,
@@ -47,24 +56,26 @@ class PickRepository @Inject constructor(
         executor: String
     ): BaseResponse {
         Log.d("PickRepository", "Снятие товара: productId=$productId, locationId=$locationId, quantity=$quantity")
-        
+
         val request = PickRequest(
             locationId = locationId,
             prunitId = prunitId,
             quantity = quantity,
             executor = executor
         )
-        
+
         return try {
             withContext(Dispatchers.IO) {
-                api.pickProduct(productId, request)
+                offlineQueue.sendOrQueue(OfflineOpType.PICK_PRODUCT, productId, request) { key ->
+                    api.pickProduct(productId, request, key)
+                }
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара: ${e.message}")
             BaseResponse(success = false, message = e.message)
         }
     }
-    
+
     suspend fun pickFromLocation(
         productId: String,
         wrShk: String,
@@ -75,7 +86,7 @@ class PickRepository @Inject constructor(
         productQnt: Int
     ): BaseResponse {
         Log.d("PickRepository", "Снятие товара из ячейки: productId=$productId, wrShk=$wrShk, quantity=$quantity")
-        
+
         val request = PickFromLocationRequest(
             productId = productId,
             WR_SHK = wrShk,
@@ -85,17 +96,19 @@ class PickRepository @Inject constructor(
             sklad_id = skladId,
             productQnt = productQnt
         )
-        
+
         return try {
             withContext(Dispatchers.IO) {
-                api.pickFromLocation(request)
+                offlineQueue.sendOrQueue(OfflineOpType.PICK_LOCATION, productId, request) { key ->
+                    api.pickFromLocation(request, key)
+                }
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара из ячейки: ${e.message}")
-            BaseResponse(success = false, message = e.message)
+            BaseResponse(success = false, message = httpErrorMessage(e))
         }
     }
-    
+
     suspend fun pickFromLocationBySkladId(
         productId: String,
         wrShk: String,
@@ -106,7 +119,7 @@ class PickRepository @Inject constructor(
         productQnt: Int
     ): BaseResponse {
         Log.d("PickRepository", "Снятие товара из ячейки с учетом склада: productId=$productId, wrShk=$wrShk, skladId=$skladId, quantity=$quantity")
-        
+
         val request = PickFromLocationRequest(
             productId = productId,
             WR_SHK = wrShk,
@@ -116,17 +129,19 @@ class PickRepository @Inject constructor(
             sklad_id = skladId,
             productQnt = productQnt
         )
-        
+
         return try {
             withContext(Dispatchers.IO) {
-                api.pickFromLocationBySkladId(request)
+                offlineQueue.sendOrQueue(OfflineOpType.PICK_LOCATION_SKLAD, productId, request) { key ->
+                    api.pickFromLocationBySkladId(request, key)
+                }
             }
         } catch (e: Exception) {
             Log.e("PickRepository", "Ошибка при снятии товара из ячейки с учетом склада: ${e.message}")
-            BaseResponse(success = false, message = e.message)
+            BaseResponse(success = false, message = httpErrorMessage(e))
         }
     }
-    
+
     suspend fun moveProduct(
         productId: String,
         sourceLocationId: String,
@@ -137,13 +152,13 @@ class PickRepository @Inject constructor(
         executor: String,
         skladId: String,
         expirationDate: String,
-        productQnt:String,
+        productQnt: String,
         reason: String
     ): BaseResponse {
         // Обрабатываем дату через ProductMovementHelper для обеспечения ISO формата
         val isoExpirationDate = ProductMovementHelper.processExpirationDate(expirationDate)
         Timber.d("Перемещение товара с датой в ISO формате: $isoExpirationDate")
-        
+
         val request = MoveProductRequest(
             sourceLocationId = sourceLocationId,
             targetLocationId = targetLocationId,
@@ -158,14 +173,32 @@ class PickRepository @Inject constructor(
             productQnt = productQnt,
             reason = reason
         )
-        
+
         return try {
-            val response = api.moveProduct(productId, request)
+            val response = offlineQueue.sendOrQueue(OfflineOpType.MOVE, productId, request) { key ->
+                api.moveProduct(productId, request, key)
+            }
             Timber.d("Результат перемещения товара: success=${response.success}, message=${response.message}")
             response
         } catch (e: Exception) {
             Timber.e(e, "Ошибка при перемещении товара")
-            BaseResponse(success = false, message = e.message)
+            BaseResponse(success = false, message = httpErrorMessage(e))
         }
     }
-} 
+
+    // Текст ошибки из тела HTTP-ответа, а не «HTTP 500 Internal Server Error»
+    private fun httpErrorMessage(e: Exception): String {
+        if (e is retrofit2.HttpException) {
+            try {
+                val body = e.response()?.errorBody()?.string()
+                if (!body.isNullOrBlank()) {
+                    val json = org.json.JSONObject(body)
+                    val fromBody = json.optString("message").ifBlank { json.optString("msg") }
+                    if (fromBody.isNotBlank()) return fromBody
+                }
+            } catch (_: Exception) {
+            }
+        }
+        return e.message ?: "Произошла ошибка при снятии товара"
+    }
+}

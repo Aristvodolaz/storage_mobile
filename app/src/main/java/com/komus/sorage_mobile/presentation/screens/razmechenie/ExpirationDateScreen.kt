@@ -2,87 +2,79 @@ package com.komus.sorage_mobile.presentation.screens.razmechenie
 
 import android.os.Build
 import androidx.annotation.RequiresApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
-import com.komus.sorage_mobile.domain.viewModel.ExpirationDateViewModel
 import com.komus.sorage_mobile.data.model.ConditionReasons
-import com.komus.sorage_mobile.domain.util.ExpirationDateValidator
-import com.komus.sorage_mobile.util.DateUtils
-import com.komus.sorage_mobile.util.ProductMovementHelper
+import com.komus.sorage_mobile.domain.viewModel.ExpirationDateViewModel
+import com.komus.sorage_mobile.presentation.components.PlacementProductHeader
 
-import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import android.util.Log
+private val GoodColor = Color(0xFF2E7D32)
+private val BadColor = Color(0xFFE65100)
 
-@OptIn(ExperimentalMaterialApi::class)
+/** Дата вводится цифрами; точки ставятся сами: 31.12.2025. */
+internal fun formatDateInput(input: String): String {
+    val digits = input.filter { it.isDigit() }.take(8)
+    return buildString {
+        digits.forEachIndexed { index, c ->
+            if (index == 2 || index == 4) append('.')
+            append(c)
+        }
+    }
+}
+
+/**
+ * Срок годности и состояние товара.
+ * Оператор выбирает состояние, при некондиции — причину, затем срок: дату производства и срок хранения,
+ * либо «без срока». Переход дальше только если данные прошли проверку.
+ */
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun ExpirationDateScreen(
     navController: NavController,
     viewModel: ExpirationDateViewModel = hiltViewModel()
 ) {
+    var condition by remember { mutableStateOf("Кондиция") }
+    var reason by remember { mutableStateOf("") }
+    var skipExpiration by remember { mutableStateOf(false) }
     var startDate by remember { mutableStateOf("") }
+    // Курсор всегда в конце после форматирования точками, иначе цифры вставляются не на место
+    var startDateField by remember { mutableStateOf(TextFieldValue("")) }
     var days by remember { mutableStateOf("") }
     var months by remember { mutableStateOf("") }
-    var endDate by remember { mutableStateOf("") }
-
-    var skipExpirationDate by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     val scrollState = rememberScrollState()
-    val startDateFocusRequester = remember { FocusRequester() }
-    val daysFocusRequester = remember { FocusRequester() }
-    val monthsFocusRequester = remember { FocusRequester() }
 
-    // Автоматический расчет конечной даты
-    LaunchedEffect(startDate, days, months) {
-        if (!skipExpirationDate && startDate.isNotEmpty() && (days.isNotEmpty() || months.isNotEmpty())) {
-            endDate = viewModel.calculateEndDate(startDate, days, months)
-        }
-    }
-    
-    // Автофокус на поле даты при загрузке экрана
-    LaunchedEffect(Unit) {
-        kotlinx.coroutines.delay(100) // Небольшая задержка для инициализации UI
-        if (!skipExpirationDate) {
-            startDateFocusRequester.requestFocus()
-        }
-    }
-
-
+    val isNonConformity = condition == "Некондиция"
+    val endDate = if (!skipExpiration) viewModel.calculateEndDate(startDate, days, months) else ""
+    val canSave = (!isNonConformity || reason.isNotBlank()) &&
+        (skipExpiration || endDate.isNotEmpty())
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text(
-                        "Срок годности", 
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    ) 
-                },
+                title = { Text("Состояние и срок", fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 backgroundColor = MaterialTheme.colors.primary,
                 contentColor = Color.White,
-                modifier = Modifier.height(44.dp)
+                modifier = Modifier.height(52.dp)
             )
         }
     ) { paddingValues ->
@@ -90,283 +82,203 @@ fun ExpirationDateScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(horizontal = 8.dp, vertical = 4.dp)
-                .verticalScroll(scrollState)
+                .padding(horizontal = 12.dp, vertical = 8.dp)
         ) {
-            // Карточка для ввода даты
-            Card(
+            PlacementProductHeader()
+
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                elevation = 2.dp,
-                shape = RoundedCornerShape(4.dp)
+                    .weight(1f)
+                    .verticalScroll(scrollState)
             ) {
-                Column(
-                    modifier = Modifier.padding(8.dp)
-                ) {
-                    Text(
-                        text = if (skipExpirationDate) "Срок годности (пропущен)" else "Дата производства",
-                        style = MaterialTheme.typography.caption,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                SectionTitle("Состояние")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    ChoiceButton(
+                        text = "Кондиция",
+                        selected = !isNonConformity,
+                        selectedColor = GoodColor,
+                        onClick = { condition = "Кондиция"; errorMessage = null },
+                        modifier = Modifier.weight(1f)
                     )
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    if (!skipExpirationDate) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedTextField(
-                                value = startDate,
-                                onValueChange = { startDate = it },
-                                label = { 
+                    ChoiceButton(
+                        text = "Некондиция",
+                        selected = isNonConformity,
+                        selectedColor = BadColor,
+                        onClick = { condition = "Некондиция"; errorMessage = null },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                if (isNonConformity) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SectionTitle("Причина некондиции")
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = 0.dp,
+                        backgroundColor = Color(0xFFFFF8E1),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column {
+                            ConditionReasons.reasons.forEach { item ->
+                                val selected = reason == item
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { reason = item; errorMessage = null }
+                                        .padding(horizontal = 12.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(selected = selected, onClick = { reason = item; errorMessage = null })
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        "Начальная дата (дд.мм.гггг)",
-                                        fontSize = 10.sp
-                                    ) 
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .focusRequester(startDateFocusRequester),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                                singleLine = true,
-                                trailingIcon = {
-                                    Icon(
-                                        imageVector = Icons.Default.CalendarToday,
-                                        contentDescription = "Календарь",
-                                        modifier = Modifier.size(16.dp)
+                                        text = item,
+                                        fontSize = 15.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
-                            )
-                            
-                            Spacer(modifier = Modifier.width(8.dp))
-                            
-                            Button(
-                                onClick = {
-                                    // Устанавливаем дату 01.01.2999 и очищаем поля
-                                    startDate = ""
-                                    days = ""
-                                    months = ""
-                                    endDate = "01.01.2999"
-                                    skipExpirationDate = true
-                                    
-                                    // Автоматически выполняем логику сохранения
-                                    val finalCondition = "Кондиция"
-                                    val finalReason = ""
-                                    
-                                    viewModel.saveExpirationData(
-                                        startDate = "01.01.2999",
-                                        days = "",
-                                        months = "",
-                                        condition = finalCondition,
-                                        reason = finalReason
-                                    )
-                                    
-                                    // Переходим на следующий экран
-                                    navController.navigate("scan_buffer_location") {
-                                        popUpTo("expiration_date") { inclusive = true }
-                                    }
-                                },
-                                modifier = Modifier.height(56.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    backgroundColor = Color(0xFF2196F3),
-                                    contentColor = Color.White
-                                )
-                            ) {
-                                Text(
-                                    "Пропустить СГ",
-                                    fontSize = 9.sp,
-                                    textAlign = TextAlign.Center
-                                )
                             }
                         }
-                    } else {
-                        Text(
-                            text = "Дата: 01.01.2999 (пропущен)",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF2196F3)
-                        )
-                        
-                        Spacer(modifier = Modifier.height(8.dp))
-                        
-                        Button(
-                            onClick = {
-                                skipExpirationDate = false
-                                endDate = ""
-                            },
-                            colors = ButtonDefaults.buttonColors(
-                                backgroundColor = Color.Gray,
-                                contentColor = Color.White
-                            )
-                        ) {
-                            Text("Ввести дату вручную", fontSize = 10.sp)
-                        }
                     }
                 }
-            }
-            
-            // Карточка для ввода срока хранения
-            if (!skipExpirationDate) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(4.dp)
+
+                Spacer(modifier = Modifier.height(12.dp))
+                SectionTitle("Срок годности")
+                OutlinedButton(
+                    onClick = { skipExpiration = !skipExpiration; errorMessage = null },
+                    modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text(
-                            text = "Срок хранения",
-                            style = MaterialTheme.typography.caption,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
-                        Row {
-                            OutlinedTextField(
-                                value = days,
-                                onValueChange = { 
-                                    // Проверяем, что введено число
-                                    if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                        days = it
-                                    }
-                                },
-                                label = { 
-                                    Text(
-                                        "Дни",
-                                        fontSize = 10.sp
-                                    ) 
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .focusRequester(daysFocusRequester),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                                singleLine = true
-                            )
-                            
-                            Spacer(modifier = Modifier.width(4.dp))
-                            
-                            OutlinedTextField(
-                                value = months,
-                                onValueChange = { 
-                                    // Проверяем, что введено число
-                                    if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                                        months = it
-                                    }
-                                },
-                                label = { 
-                                    Text(
-                                        "Месяцы",
-                                        fontSize = 10.sp
-                                    ) 
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .focusRequester(monthsFocusRequester),
-                                textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
-                                singleLine = true
-                            )
-                        }
-                    }
+                    Text(
+                        if (skipExpiration) "✓ Срок не указан (2999)" else "Срок не указан — нажмите, если нет даты",
+                        fontSize = 14.sp,
+                        fontWeight = if (skipExpiration) FontWeight.Bold else FontWeight.Normal
+                    )
                 }
-                
-                // Карточка с результатом расчета
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    elevation = 2.dp,
-                    shape = RoundedCornerShape(4.dp),
-                    backgroundColor = if (endDate.isNotEmpty()) Color(0xFFE8F5E9) else MaterialTheme.colors.surface
-                ) {
-                    Column(
-                        modifier = Modifier.padding(8.dp)
-                    ) {
-                        Text(
-                            text = "Дата окончания срока годности",
-                            style = MaterialTheme.typography.caption,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                        
-                        Spacer(modifier = Modifier.height(4.dp))
-                        
+
+                if (!skipExpiration) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = startDateField,
+                        onValueChange = { typed ->
+                            val formatted = formatDateInput(typed.text)
+                            startDate = formatted
+                            startDateField = TextFieldValue(formatted, TextRange(formatted.length))
+                            errorMessage = null
+                        },
+                        label = { Text("Дата производства", fontSize = 13.sp) },
+                        placeholder = { Text("дд.мм.гггг", fontSize = 16.sp) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 20.sp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         OutlinedTextField(
-                            value = endDate,
-                            onValueChange = {},
-                            label = { 
-                                Text(
-                                    "Конечная дата",
-                                    fontSize = 10.sp
-                                ) 
-                            },
-                            enabled = false,
-                            modifier = Modifier.fillMaxWidth(),
-                            textStyle = LocalTextStyle.current.copy(fontSize = 12.sp),
+                            value = days,
+                            onValueChange = { if (it.all(Char::isDigit) && it.length <= 4) { days = it; errorMessage = null } },
+                            label = { Text("Дни", fontSize = 13.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.DateRange,
-                                    contentDescription = "Дата окончания",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+                            modifier = Modifier.weight(1f)
                         )
+                        OutlinedTextField(
+                            value = months,
+                            onValueChange = { if (it.all(Char::isDigit) && it.length <= 3) { months = it; errorMessage = null } },
+                            label = { Text("Месяцы", fontSize = 13.sp) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            textStyle = LocalTextStyle.current.copy(fontSize = 18.sp),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        elevation = 0.dp,
+                        backgroundColor = if (endDate.isNotEmpty()) Color(0xFFE8F5E9) else Color(0xFFF5F5F5),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text("Годен до", fontSize = 13.sp)
+                            Text(
+                                text = endDate.ifEmpty { "—" },
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (endDate.isNotEmpty()) GoodColor else Color.Gray
+                            )
+                        }
                     }
                 }
             }
-            
 
+            errorMessage?.let {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(it, fontSize = 14.sp, color = MaterialTheme.colors.error, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            }
 
-            // Кнопка сохранения
+            Spacer(modifier = Modifier.height(8.dp))
             Button(
                 onClick = {
-                    // Устанавливаем состояние "Кондиция" по умолчанию
-                    val finalCondition = "Кондиция"
-                    val finalReason = ""
-                    
-                    // Сохраняем данные
-                    val finalStartDate = if (skipExpirationDate) "01.01.2999" else startDate
-                    val finalDays = if (skipExpirationDate) "" else days
-                    val finalMonths = if (skipExpirationDate) "" else months
-                    
-                    viewModel.saveExpirationData(
-                        startDate = finalStartDate,
-                        days = finalDays,
-                        months = finalMonths,
-                        condition = finalCondition,
-                        reason = finalReason
+                    val error = viewModel.save(
+                        skipExpiration = skipExpiration,
+                        startDate = startDate,
+                        days = days,
+                        months = months,
+                        condition = condition,
+                        reason = reason
                     )
-                                            navController.navigate("scan_buffer_location") {
+                    if (error == null) {
+                        navController.navigate("scan_buffer_location") {
                             popUpTo("expiration_date") { inclusive = true }
                         }
+                    } else {
+                        errorMessage = error
+                    }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-                    .height(36.dp),
-                enabled = skipExpirationDate || (startDate.isNotEmpty() && endDate.isNotEmpty()),
+                enabled = canSave,
+                modifier = Modifier.fillMaxWidth().height(56.dp),
                 colors = ButtonDefaults.buttonColors(
                     backgroundColor = MaterialTheme.colors.primary,
                     contentColor = Color.White
                 )
             ) {
-                Text(
-                    "СОХРАНИТЬ",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Text("СОХРАНИТЬ И ДАЛЕЕ", fontSize = 16.sp, fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 6.dp, top = 4.dp)
+    )
+}
+
+@Composable
+private fun ChoiceButton(
+    text: String,
+    selected: Boolean,
+    selectedColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(56.dp),
+        colors = ButtonDefaults.buttonColors(
+            backgroundColor = if (selected) selectedColor else Color(0xFFE0E0E0),
+            contentColor = if (selected) Color.White else Color.Black
+        )
+    ) {
+        Text(
+            text = if (selected) "✓ $text" else text,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

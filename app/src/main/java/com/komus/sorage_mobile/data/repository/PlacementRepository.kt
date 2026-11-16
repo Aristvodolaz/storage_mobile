@@ -3,6 +3,8 @@ package com.komus.sorage_mobile.data.repository
 import android.util.Log
 import com.komus.sorage_mobile.data.api.StorageApi
 import com.komus.sorage_mobile.data.db.dao.PlacementDao
+import com.komus.sorage_mobile.data.offline.OfflineOpType
+import com.komus.sorage_mobile.data.offline.OfflineQueue
 import com.komus.sorage_mobile.data.request.PlaceProductRequest
 import com.komus.sorage_mobile.data.response.BaseResponse
 import kotlinx.coroutines.Dispatchers
@@ -13,7 +15,8 @@ import javax.inject.Singleton
 @Singleton
 class PlacementRepository @Inject constructor(
     private val api: StorageApi,
-    private val placementDao: PlacementDao
+    private val placementDao: PlacementDao,
+    private val offlineQueue: OfflineQueue
 ) {
     suspend fun placeProductToBuffer(
         productId: String,
@@ -28,10 +31,11 @@ class PlacementRepository @Inject constructor(
         article: String? = "",
         skladId: String? = "",
         reason: String? = "",
-        productQnt: Int
+        productQnt: Int,
+        exPalletType: String? = null
     ): Result<BaseResponse> {
         return try {
-            Log.d(TAG, "Отправка запроса на размещение в буфер: productId=$productId, wrShk=$wrShk, skladId=$skladId, reason=$reason")
+            Log.d(TAG, "Отправка запроса на размещение в буфер: productId=$productId, wrShk=$wrShk, skladId=$skladId, reason=$reason, exPalletType=$exPalletType")
 
             val request = PlaceProductRequest(
                 prunitId = prunitId,
@@ -45,11 +49,14 @@ class PlacementRepository @Inject constructor(
                 article = article,
                 skladId = skladId,
                 reason = reason,
-                productQnt = productQnt
+                productQnt = productQnt,
+                exPalletType = exPalletType
             )
 
             val response = withContext(Dispatchers.IO) {
-                api.placeProductToBuffer(productId, request)
+                offlineQueue.sendOrQueue(OfflineOpType.PLACE_BUFFER, productId, request) { key ->
+                    api.placeProductToBuffer(productId, request, key)
+                }
             }
 
             if (response.success) {
