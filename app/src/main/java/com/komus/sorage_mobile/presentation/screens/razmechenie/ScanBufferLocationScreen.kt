@@ -177,7 +177,7 @@ fun ScanBufferLocationScreen(
                 Column {
                     Text(successMessage)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("Ячейка: $pendingLocationId", fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary)
+                    Text("Ячейка: ${(check as? PlacementViewModel.LocationCheck.Found)?.name ?: pendingLocationId}", fontWeight = FontWeight.Bold, color = MaterialTheme.colors.primary)
                 }
             },
             confirmButton = {
@@ -251,8 +251,9 @@ fun ScanBufferLocationScreen(
                     }
                 } else {
                     Text("Ячейка", fontSize = 14.sp, color = Color.DarkGray)
+                    // Имя ячейки, если сервер его вернул; иначе код, который отсканировали
                     Text(
-                        text = pendingLocationId,
+                        text = (check as? PlacementViewModel.LocationCheck.Found)?.name ?: pendingLocationId,
                         fontSize = 30.sp,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center
@@ -300,7 +301,7 @@ private fun LocationStatus(check: PlacementViewModel.LocationCheck) {
     when (check) {
         is PlacementViewModel.LocationCheck.Checking -> Text("Проверка ячейки…", fontSize = 15.sp, color = Color.DarkGray)
         is PlacementViewModel.LocationCheck.Found -> Text(
-            "✓ ${check.name}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = OkColor, textAlign = TextAlign.Center
+            "✓ Ячейка найдена", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = OkColor, textAlign = TextAlign.Center
         )
         is PlacementViewModel.LocationCheck.NotFound -> Text(
             "Ячейка не найдена в системе.\nОтсканируйте другую.",
